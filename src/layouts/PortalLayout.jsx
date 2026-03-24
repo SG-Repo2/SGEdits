@@ -47,6 +47,7 @@ export function PortalLayout() {
             currentProfile?.role === 'coach' ? (
               <CoachNotifications
                 notifications={coachNotifications}
+                onClose={() => setNotificationsOpen(false)}
                 onMarkReviewed={handleMarkReviewed}
                 onToggle={() => setNotificationsOpen((value) => !value)}
                 open={notificationsOpen}

@@ -1,13 +1,31 @@
+import { useEffect, useRef } from 'react';
 import { Bell } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '../common/Button';
 import { formatDate } from '../../utils/date';
 
-export function CoachNotifications({ notifications, onMarkReviewed, open, onToggle }) {
+export function CoachNotifications({ notifications, onMarkReviewed, open, onToggle, onClose }) {
   const unreadCount = notifications.length;
+  const notificationCenterRef = useRef(null);
+
+  useEffect(() => {
+    const handleMouseDown = (event) => {
+      if (!open || !notificationCenterRef.current?.contains(event.target)) {
+        if (open) {
+          onClose();
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleMouseDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+    };
+  }, [onClose, open]);
 
   return (
-    <div className="notification-center">
+    <div className="notification-center" ref={notificationCenterRef}>
       <button className={['icon-button', 'notification-trigger', open ? 'notification-trigger--active' : ''].filter(Boolean).join(' ')} onClick={onToggle} type="button">
         <Bell size={18} />
         {unreadCount ? <span className="notification-trigger__count">{unreadCount}</span> : null}
