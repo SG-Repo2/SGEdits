@@ -1,69 +1,57 @@
-import { useMemo, useState } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { usePortal } from '../app/providers/PortalProvider';
-import { CoachNotifications } from '../components/layout/CoachNotifications';
-import { coachNavigation, studentNavigation } from '../config/navigation';
-import { PortalHeader } from '../components/layout/PortalHeader';
-import { PortalSidebar } from '../components/layout/PortalSidebar';
-import { getCoachNotifications } from '../utils/selectors';
+import { studentNavigation, coachNavigation } from '../config/navigation';
+import { LogOut } from 'lucide-react';
 
 export function PortalLayout() {
-  const { currentProfile, profiles, students, selfAssessments, loginAsProfile, logout, markAssessmentReviewed } = usePortal();
+  const { currentProfile, logout, isDemoMode, profiles } = usePortal();
+  const location = useLocation();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const nav = currentProfile?.role === 'coach' ? coachNavigation : studentNavigation;
 
-  const navigation = useMemo(
-    () => (currentProfile?.role === 'coach' ? coachNavigation : studentNavigation),
-    [currentProfile?.role],
-  );
-  const coachNotifications = useMemo(
-    () => (currentProfile?.role === 'coach' ? getCoachNotifications(students, selfAssessments) : []),
-    [currentProfile?.role, selfAssessments, students],
-  );
-
-  const handleProfileChange = (profileId) => {
-    const profile = profiles.find((item) => item.id === profileId);
-    if (!profile) return;
-    loginAsProfile(profile.id);
-    navigate(profile.homePath);
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
-  const handleMarkReviewed = (studentId) => {
-    markAssessmentReviewed(studentId);
-  };
+  const handleLogout = () => { logout(); navigate('/login'); };
 
   return (
-    <div className="portal-shell">
-      <PortalSidebar navigation={navigation} onClose={() => setSidebarOpen(false)} open={sidebarOpen} profile={currentProfile} />
-      <div className="portal-shell__main">
-        <PortalHeader
-          coachNotifications={
-            currentProfile?.role === 'coach' ? (
-              <CoachNotifications
-                notifications={coachNotifications}
-                onClose={() => setNotificationsOpen(false)}
-                onMarkReviewed={handleMarkReviewed}
-                onToggle={() => setNotificationsOpen((value) => !value)}
-                open={notificationsOpen}
-              />
-            ) : null
-          }
-          currentProfile={currentProfile}
-          onLogout={handleLogout}
-          onProfileChange={handleProfileChange}
-          onToggleSidebar={() => setSidebarOpen((open) => !open)}
-          profiles={profiles}
-        />
-        <main className="portal-shell__content">
+    <>
+      <nav className="nav">
+        <div className="nav-logo">Ace The <em>DAT</em></div>
+        <div className="nav-right">
+          {isDemoMode && <span className="tag tag-gold">Demo Mode</span>}
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-lo)', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+            {currentProfile?.name}
+          </span>
+          <span className="tag tag-muted" style={{ fontSize: 9 }}>
+            {currentProfile?.role === 'coach' ? 'Coach' : 'Student'}
+          </span>
+          <button onClick={handleLogout} className="btn btn-subtle" style={{ padding: '5px 12px', fontSize: 11 }}>
+            <LogOut size={13} /> Log out
+          </button>
+        </div>
+      </nav>
+      <div className="portal-shell">
+        <aside className="portal-sidebar">
+          <div className="portal-sidebar-label">
+            {currentProfile?.role === 'coach' ? 'Coach Tools' : 'Study Portal'}
+          </div>
+          {nav.map(item => {
+            const Icon = item.icon;
+            const active = location.pathname === item.to;
+            return (
+              <div
+                key={item.to}
+                className={`nav-item ${active ? 'active' : ''}`}
+                onClick={() => navigate(item.to)}
+              >
+                <Icon size={16} />
+                <span>{item.label}</span>
+              </div>
+            );
+          })}
+        </aside>
+        <main className="portal-main">
           <Outlet />
         </main>
       </div>
-    </div>
+    </>
   );
 }
