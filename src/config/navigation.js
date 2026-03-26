@@ -1,17 +1,16 @@
-import { CalendarDays, CreditCard, FilePenLine, GraduationCap, LayoutDashboard, ScrollText, Users } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, BookOpen, FileText, TrendingUp, Users, Stethoscope, ClipboardList } from 'lucide-react';
+
+export const studentNavigation = [
+  { label: 'Dashboard', to: '/student/dashboard', icon: LayoutDashboard },
+  { label: 'Weekly Plan', to: '/student/weekly-plan', icon: CalendarDays },
+  { label: 'My Sections', to: '/student/sections', icon: BookOpen },
+  { label: 'MQL Log', to: '/student/mql', icon: FileText },
+  { label: 'Progress', to: '/student/progress', icon: TrendingUp },
+];
 
 export const coachNavigation = [
   { label: 'Dashboard', to: '/coach/dashboard', icon: LayoutDashboard },
   { label: 'Students', to: '/coach/students', icon: Users },
-  { label: 'Sessions', to: '/coach/sessions', icon: ScrollText },
-  { label: 'Billing', to: '/coach/payments', icon: CreditCard },
-  { label: 'Schedules', to: '/coach/schedules', icon: CalendarDays },
-];
-
-export const studentNavigation = [
-  { label: 'Dashboard', to: '/student/dashboard', icon: LayoutDashboard },
-  { label: 'Self-Assessment', to: '/student/self-assessment', icon: FilePenLine },
-  { label: 'Weekly Plan', to: '/student/weekly-plan', icon: CalendarDays },
-  { label: 'Billing', to: '/student/payments', icon: CreditCard },
-  { label: 'Sessions', to: '/student/sessions', icon: GraduationCap },
+  { label: 'Diagnostic', to: '/coach/diagnostic', icon: Stethoscope },
+  { label: 'Session Flow', to: '/coach/session-flow', icon: ClipboardList },
 ];
