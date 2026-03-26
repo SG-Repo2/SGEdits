@@ -1,82 +1,88 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePortal } from '../../app/providers/PortalProvider';
-import { Button } from '../../components/common/Button';
-import { Badge } from '../../components/common/Badge';
-import { AuthLayout } from '../../layouts/AuthLayout';
 
 export function LoginPage() {
-  const { currentProfile, profiles, loginAsProfile } = usePortal();
+  const { profiles, loginAsProfile } = usePortal();
   const navigate = useNavigate();
-  const coachProfile = profiles.find((profile) => profile.role === 'coach');
-  const studentProfiles = profiles.filter((profile) => profile.role === 'student');
-  const [selectedStudentProfileId, setSelectedStudentProfileId] = useState(studentProfiles[0]?.id || '');
+  const [selected, setSelected] = useState('');
 
-  useEffect(() => {
-    if (currentProfile) {
-      navigate(currentProfile.homePath, { replace: true });
-    }
-  }, [currentProfile, navigate]);
+  const coachProfile = profiles.find(p => p.role === 'coach');
+  const studentProfiles = profiles.filter(p => p.role === 'student');
 
-  const handleCoachLogin = () => {
-    if (!coachProfile) return;
-    loginAsProfile(coachProfile.id);
-    navigate(coachProfile.homePath);
-  };
-
-  const handleStudentLogin = () => {
-    const profile = studentProfiles.find((item) => item.id === selectedStudentProfileId);
-    if (!profile) return;
-    loginAsProfile(profile.id);
-    navigate(profile.homePath);
+  const handleLogin = (profileId) => {
+    loginAsProfile(profileId);
+    const profile = profiles.find(p => p.id === profileId);
+    navigate(profile?.homePath || '/');
   };
 
   return (
-    <AuthLayout>
-      <div className="auth-card">
-        <div className="auth-card__header">
-          <Badge tone="success">Demo mode</Badge>
-          <h2>Choose a portal view</h2>
-          <p>The login uses seeded local data today and the same repository contract can point to Supabase later.</p>
-        </div>
-
-        <div className="auth-card__section">
-          <div className="auth-choice">
-            <div>
-              <h3>Coach / admin</h3>
-              <p>Operations dashboard, students roster, billing visibility, and weekly plan editing.</p>
-            </div>
-            <Button onClick={handleCoachLogin}>Open coach workspace</Button>
+    <div className="login-page">
+      <div className="login-container animate-in">
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--ivory)', marginBottom: 4 }}>
+            Ace The <em style={{ color: 'var(--gold)', fontStyle: 'italic' }}>DAT</em>
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--text-lo)' }}>
+            Student Portal
           </div>
         </div>
 
-        <div className="auth-card__section">
-          <div className="auth-choice auth-choice--stack">
-            <div>
-              <h3>Student portal</h3>
-              <p>Switch into any seeded student profile to review weekly plans, sessions, and payment status.</p>
+        <div className="login-card">
+          <div className="demo-banner">
+            Demo Mode — Choose a portal view
+          </div>
+
+          {/* Coach */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--text-lo)', marginBottom: 8 }}>
+              Coach / Admin
             </div>
-            <label className="select-shell">
-              <span>Student demo profile</span>
-              <select onChange={(event) => setSelectedStudentProfileId(event.target.value)} value={selectedStudentProfileId}>
-                {studentProfiles.map((profile) => (
-                  <option key={profile.id} value={profile.id}>
-                    {profile.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <Button onClick={handleStudentLogin} tone="accent">
-              Open student portal
-            </Button>
+            <div style={{ fontSize: 13, color: 'var(--text-mid)', marginBottom: 12, lineHeight: 1.6 }}>
+              Diagnostic engine, student modeling, feedback builder, and session flow.
+            </div>
+            <button className="btn btn-gold" onClick={() => handleLogin(coachProfile.id)} style={{ width: '100%', justifyContent: 'center' }}>
+              Open Coach Workspace
+            </button>
+          </div>
+
+          <div style={{ height: 1, background: 'var(--border)', margin: '20px 0' }} />
+
+          {/* Students */}
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--text-lo)', marginBottom: 8 }}>
+              Student Portal
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-mid)', marginBottom: 12, lineHeight: 1.6 }}>
+              Weekly plan, daily tasks, section frameworks, MQL log, and progress tracking.
+            </div>
+            <select
+              className="form-select"
+              value={selected}
+              onChange={(e) => setSelected(e.target.value)}
+              style={{ marginBottom: 12 }}
+            >
+              <option value="">Choose student...</option>
+              {studentProfiles.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <button
+              className="btn btn-ghost"
+              disabled={!selected}
+              onClick={() => handleLogin(selected)}
+              style={{ width: '100%', justifyContent: 'center', opacity: selected ? 1 : 0.4 }}
+            >
+              Open Student Portal
+            </button>
           </div>
         </div>
 
-        <div className="auth-card__footer">
-          <p>What is real right now: routing, state, seeded local repositories, editable weekly plans, role-based views, and Netlify-ready SPA routing.</p>
-          <p>What is placeholder: Supabase auth, database persistence, and live tutor/student permissions.</p>
+        <div style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+          Uses seeded local data today.<br />
+          Same architecture connects to Supabase later.
         </div>
       </div>
-    </AuthLayout>
+    </div>
   );
 }
