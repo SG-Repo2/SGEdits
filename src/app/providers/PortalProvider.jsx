@@ -94,7 +94,7 @@ export function PortalProvider({ children }) {
 
   const addMqlError = useCallback((error) => {
     setMqlErrors(prev => {
-      const next = [...prev, { ...error, id: `mql-${Date.now()}`, date: new Date().toISOString().split('T')[0] }];
+      const next = [...prev, { ...error, id: \`mql-\${Date.now()}\`, date: new Date().toISOString().split('T')[0] }];
       persist({ mqlErrors: next });
       return next;
     });
