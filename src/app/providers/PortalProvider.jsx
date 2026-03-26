@@ -66,7 +66,7 @@ export function PortalProvider({ children }) {
   const loginAsProfile = useCallback((profileId) => {
     const profile = profiles.find(p => p.id === profileId);
     if (!profile) return;
-    const nextSession = { profileId: profile.id, role: profile.role, studentId: profile.studentId || null, name: profile.name };
+    const nextSession = { profileId: profile.id, role: profile.role, studentId: profile.studentId || null };
     setSession(nextSession);
     persist({ session: nextSession });
   }, [profiles, persist]);
@@ -94,7 +94,7 @@ export function PortalProvider({ children }) {
 
   const addMqlError = useCallback((error) => {
     setMqlErrors(prev => {
-      const next = [...prev, { ...error, id: \`mql-\${Date.now()}\`, date: new Date().toISOString().split('T')[0] }];
+      const next = [...prev, { ...error, id: `mql-${Date.now()}`, date: new Date().toISOString().split('T')[0] }];
       persist({ mqlErrors: next });
       return next;
     });
@@ -127,3 +127,4 @@ export function usePortal() {
   if (!ctx) throw new Error('usePortal must be used inside PortalProvider');
   return ctx;
 }
+
