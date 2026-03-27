@@ -203,7 +203,7 @@ export function SupabaseProvider({ children }) {
     if (!profile) return { success: false, error: 'Profile not found' };
     const nextSession = { profileId: profile.id, role: profile.role, name: profile.name, studentId: profile.student_id || null };
     setSession(nextSession);
-    await loadAllData();
+    loadAllData(); // non-blocking — data loads in background
     return { success: true, profile: { ...profile, homePath: profile.home_path } };
   }, [loadAllData]);
 
