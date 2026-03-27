@@ -155,10 +155,18 @@ export function SupabaseProvider({ children }) {
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, s) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+      // IMPORTANT: This callback fires inside the supabase auth lock.
+      // Do NOT await supabase calls here — they deadlock (same-lock re-entrance).
+      // Defer all supabase work outside the lock via setTimeout.
       if (event === 'SIGNED_IN' && s?.user) {
-        await resolveSession(s.user);
-        await loadAllData();
+        const user = s.user;
+        setTimeout(async () => {
+          if (mounted) {
+            await resolveSession(user);
+            await loadAllData();
+          }
+        }, 0);
       } else if (event === 'SIGNED_OUT') {
         setSession(null);
         setStudents([]);
