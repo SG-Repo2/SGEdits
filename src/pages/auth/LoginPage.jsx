@@ -1,26 +1,42 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePortal } from '../../app/providers/PortalProvider';
+import { Eye, EyeOff, LogIn } from 'lucide-react';
 
 export function LoginPage() {
-  const { profiles, loginAsProfile } = usePortal();
+  const { loginWithCredentials } = usePortal();
   const navigate = useNavigate();
-  const [selected, setSelected] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const coachProfile = profiles.find(p => p.role === 'coach');
-  const studentProfiles = profiles.filter(p => p.role === 'student');
-
-  const handleLogin = (profileId) => {
-    loginAsProfile(profileId);
-    const profile = profiles.find(p => p.id === profileId);
-    navigate(profile?.homePath || '/');
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setError('');
+    if (!email.trim() || !password.trim()) {
+      setError('Enter your email and password');
+      return;
+    }
+    setLoading(true);
+    // Simulate tiny delay for feel
+    setTimeout(() => {
+      const result = loginWithCredentials(email.trim(), password);
+      if (result.success) {
+        navigate(result.profile.homePath || '/');
+      } else {
+        setError(result.error);
+        setLoading(false);
+      }
+    }, 300);
   };
 
   return (
     <div className="login-page">
       <div className="login-container animate-in">
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--ivory)', marginBottom: 4 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, color: 'var(--ivory)', marginBottom: 4, letterSpacing: '-0.3px' }}>
             Ace The <em style={{ color: 'var(--gold)', fontStyle: 'italic' }}>DAT</em>
           </div>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--text-lo)' }}>
@@ -29,58 +45,85 @@ export function LoginPage() {
         </div>
 
         <div className="login-card">
-          <div className="demo-banner">
-            Demo Mode — Choose a portal view
-          </div>
+          <form onSubmit={handleSubmit}>
+            {/* Email */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--text-lo)', marginBottom: 6 }}>
+                Email
+              </label>
+              <input
+                type="email"
+                className="form-input"
+                placeholder="you@acethedat.com"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                autoComplete="email"
+                autoFocus
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
 
-          {/* Coach */}
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--text-lo)', marginBottom: 8 }}>
-              Coach / Admin
+            {/* Password */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--text-lo)', marginBottom: 6 }}>
+                Password
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPw ? 'text' : 'password'}
+                  className="form-input"
+                  placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                  autoComplete="current-password"
+                  style={{ width: '100%', boxSizing: 'border-box', paddingRight: 40 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw(!showPw)}
+                  style={{
+                    position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                    background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+                    color: 'var(--text-muted)', display: 'flex'
+                  }}
+                >
+                  {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
             </div>
-            <div style={{ fontSize: 13, color: 'var(--text-mid)', marginBottom: 12, lineHeight: 1.6 }}>
-              Diagnostic engine, student modeling, feedback builder, and session flow.
-            </div>
-            <button className="btn btn-gold" onClick={() => handleLogin(coachProfile.id)} style={{ width: '100%', justifyContent: 'center' }}>
-              Open Coach Workspace
-            </button>
-          </div>
 
-          <div style={{ height: 1, background: 'var(--border)', margin: '20px 0' }} />
+            {/* Error */}
+            {error && (
+              <div style={{
+                padding: '10px 14px', borderRadius: 8, marginBottom: 16,
+                background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)',
+                fontSize: 12.5, color: '#ef4444', fontWeight: 500
+              }}>
+                {error}
+              </div>
+            )}
 
-          {/* Students */}
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--text-lo)', marginBottom: 8 }}>
-              Student Portal
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--text-mid)', marginBottom: 12, lineHeight: 1.6 }}>
-              Weekly plan, daily tasks, section frameworks, MQL log, and progress tracking.
-            </div>
-            <select
-              className="form-select"
-              value={selected}
-              onChange={(e) => setSelected(e.target.value)}
-              style={{ marginBottom: 12 }}
-            >
-              <option value="">Choose student...</option>
-              {studentProfiles.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
+            {/* Submit */}
             <button
-              className="btn btn-ghost"
-              disabled={!selected}
-              onClick={() => handleLogin(selected)}
-              style={{ width: '100%', justifyContent: 'center', opacity: selected ? 1 : 0.4 }}
+              type="submit"
+              className="btn btn-gold"
+              disabled={loading}
+              style={{ width: '100%', justifyContent: 'center', padding: '12px 0', fontSize: 13.5, fontWeight: 600, gap: 8 }}
             >
-              Open Student Portal
+              {loading ? (
+                <span style={{ opacity: 0.7 }}>Signing in...</span>
+              ) : (
+                <>
+                  <LogIn size={15} />
+                  Sign In
+                </>
+              )}
             </button>
-          </div>
+          </form>
         </div>
 
-        <div style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-          Uses seeded local data today.<br />
-          Same architecture connects to Supabase later.
+        <div style={{ textAlign: 'center', marginTop: 24, fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.7 }}>
+          Don't have an account? Contact your coach.
         </div>
       </div>
     </div>
