@@ -59,11 +59,11 @@ export function StudentWeeklyPlan() {
               </span>
               {day.isToday && <span className="tag tag-gold">Today</span>}
             </div>
-            <div className="day-card-sub">{dayTotal} tasks Â· ~{Math.round(dayMins / 60 * 10) / 10}h</div>
+            <div className="day-card-sub">{dayTotal} tasks · ~{Math.round(dayMins / 60 * 10) / 10}h</div>
           </div>
           <div>
             <div className="day-card-pct" style={{ color: dayPct === 100 ? 'var(--success)' : day.color }}>
-              {dayPct === 100 ? 'â' : `${dayPct}%`}
+              {dayPct === 100 ? '✓' : `${dayPct}%`}
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'right', marginTop: 2 }}>{dayDone} of {dayTotal}</div>
           </div>
@@ -99,7 +99,7 @@ export function StudentWeeklyPlan() {
                 const cc = TASK_CATEGORIES[task.cat] || TASK_CATEGORIES.Core;
                 return (
                   <div key={task.id} className={`task-item ${done ? 'done' : ''}`}>
-                    <div className="task-check" onClick={() => toggleTask(task.id)}>{done ? 'â' : ''}</div>
+                    <div className="task-check" onClick={() => toggleTask(task.id)}>{done ? '✓' : ''}</div>
                     <span className="task-cat" style={{ background: cc.bg, borderColor: cc.border, color: cc.color }}>{task.cat}</span>
                     <span className="task-text">{task.text}</span>
                     {task.mins > 0 && <span style={{ fontSize: 10, color: 'var(--text-muted)', flexShrink: 0, fontFamily: 'monospace' }}>{task.mins}m</span>}
@@ -123,7 +123,7 @@ export function StudentWeeklyPlan() {
         {/* Student notes */}
         <div style={{ padding: '14px 18px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
           <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 7 }}>
-            Your notes â {day.label}
+            Your notes — {day.label}
           </div>
           <textarea
             className="form-textarea"
@@ -136,4 +136,3 @@ export function StudentWeeklyPlan() {
     </div>
   );
 }
-
