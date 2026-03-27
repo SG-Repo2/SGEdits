@@ -132,7 +132,7 @@ function EditBlockModal({ block, onSave, onCancel }) {
             rows={2} placeholder="Coach notes for this block..." />
         </div>
         <div className="modal-actions">
-          <button classame="btn-ghost" onClick={onCancel}>Cancel</button>
+          <button className="btn-ghost" onClick={onCancel}>Cancel</button>
           <button className="btn-primary" onClick={handleSave}>Save</button>
         </div>
       </div>
