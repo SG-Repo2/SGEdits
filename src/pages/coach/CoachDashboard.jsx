@@ -163,7 +163,7 @@ export function CoachDashboard() {
               </button>
             </div>
 
-            {/* Success State â Show Credentials */}
+            {/* Success State — Show Credentials */}
             {justAdded ? (
               <div style={{ padding: '24px' }}>
                 <div style={{
