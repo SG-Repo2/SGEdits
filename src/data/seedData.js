@@ -10,7 +10,7 @@ export const ERROR_CATEGORIES = {
   2: { label: 'Classic Mix-Up', color: '#f97316', bg: 'rgba(249,115,22,0.12)', desc: 'Confused two similar things — had the wrong model in your head' },
   3: { label: 'Brain Fart', color: '#eab308', bg: 'rgba(234,179,8,0.12)', desc: 'You know this — just blanked or overthought it' },
   4: { label: 'Silly Mistake', color: '#C9A84C', bg: 'rgba(201,168,76,0.12)', desc: 'Misread, rushed, or picked the wrong bubble' },
-  5: {label: 'Ran Out of Time', color: '#9333ea', bg: 'rgba(147,51,234,0.12)', desc: "Knew how to solve it but the clock beat you" },
+  5: { label: 'Ran Out of Time', color: '#9333ea', bg: 'rgba(147,51,234,0.12)', desc: "Knew how to solve it but the clock beat you" },
 };
 
 export const TASK_CATEGORIES = {
@@ -42,7 +42,7 @@ export const demoProfiles = [
   { id: 'student-arianna', role: 'student', name: 'Arianna', studentId: 'arianna', label: 'Arianna Portal', homePath: '/student/dashboard' },
 ];
 
-// ── STDTENTMT3 ──
+// ── STUDENTS ──
 export const demoStudents = [
   {
     id: 'haniyeh', name: 'Haniyeh', initials: 'H', color: '#C9A84C',
@@ -51,7 +51,7 @@ export const demoStudents = [
     sections: { Bio: 17, GChem: 19, OChem: 14, PAT: 16, QR: 18, RC: 15 },
     predicted: 19, ceiling: 24,
     weakAreas: ['OChem mechanisms', 'RC passage mapping', 'PAT hole punching'],
-    coachNote: `you've done the diagnostic — now we build. This week has two priorities: OChem and RC. OChem is where the gap is clearest. RC is newer ground, but the 5-step system will change how you read passages completely.\n\nWork the MQL every single day. When you miss a question, write the correct reasoning in your own words before you move on.`,
+    coachNote: `You've done the diagnostic — now we build. This week has two priorities: OChem and RC. OC is where the gap is clearest. RC is newer ground, but the 5-step system will change how you read passages completely.\n\nWork the MQL every single day. When you miss a question, write the correct reasoning in your own words before you move on.`,
     focusTags: ['OChem decision tree', 'RC 5-step system', 'MQL every day', 'QR setup habit', 'PAT hole punching'],
   },
   {
@@ -67,7 +67,7 @@ export const demoStudents = [
 ];
 
 // ── COLOR PALETTE FOR NEW STUDENTS ──
-export const STDTENTNT_COLORS = [
+export const STUDENT_COLORS = [
   '#C9A84C', '#7fc8a0', '#6495ed', '#e8837c', '#9b8ec4',
   '#f0a868', '#6cc9c9', '#c87dba', '#8db660', '#d4a76a',
 ];
@@ -155,9 +155,9 @@ export const haniyehWeekPlan = {
         { id: 'f1', text: 'PAT \u2014 10 hole punching Qs timed (under 90 sec each) + 10 pattern folding Qs', cat: 'Daily', section: 'PAT', mins: 30 },
         { id: 'f2', text: 'Bio \u2014 2 targeted Bio Bites from MQL flags. Last Bio before Saturday.', cat: 'Daily', section: 'Bio', mins: 20 },
         { id: 'f3', text: 'OC Bootcamp: 20 timed questions. Apply decision tree. Name type before solving.', cat: 'Core', section: 'OChem', mins: 45 },
-        { id: 'f4', text: 'OC After each wrong answer \u2014 write which decision tree step broke down.', cat: 'Core', section: 'OChem', mins: 15 },
+        { id: 'f4', text: 'OC: After each wrong answer \u2014 write which decision tree step broke down.', cat: 'Core', section: 'OChem', mins: 15 },
         { id: 'f5', text: 'QR \u2014 15 word problem setups. Equation structure before calculation.', cat: 'Core', section: 'QR', mins: 30 },
-        { id: 'f6',  text: 'RC: Re-read RC Rules Card. Write all 5 steps from memory. No passages.', cat: 'RC Prep', section: 'RC', mins: 15 },
+        { id: 'f6', text: 'RC: Re-read RC Rules Card. Write all 5 steps from memory. No passages.', cat: 'RC Prep', section: 'RC', mins: 15 },
         { id: 'f7', text: 'Stop studying. Rest tonight. Walk into Saturday prepared, not exhausted.', cat: 'Rest', section: null, mins: 0 },
       ],
     },
@@ -234,7 +234,7 @@ export const sectionFrameworks = {
     badge: 'Steady', badgeColor: '#16a34a',
     status: 'Solid', statusColor: '#16a34a',
     tagline: 'Your approach just needs to be more targeted \u2014 not more time',
-    where: "Bio is steady. The issue is random review vs. targeted MQL driven review.",
+    where: "Bio is steady. The issue is random review vs. targeted MQL-driven review.",
     approach: [
       { text: 'Start with MQL, not Bootcamp. Find every Bio miss, then find the specific Bio Bite.', color: '#16a34a' },
       { text: 'Then do one adjacent Bite. Prevents isolated memorization.', color: '#16a34a' },
