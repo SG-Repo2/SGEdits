@@ -1,12 +1,3 @@
-import { usePortal } from '../../app/providers/PortalProvider';
-import { useNavigate } from 'react-router-dom';
-import { demoStudents } from '../../data/seedData';
-import { Users, TrendingUp, AlertCircle, ArrowRight } from 'lucide-react';
-
-export function CoachDashboard() {
-  const { session } = usePortal();
-  const navigate = useNavigate();
-
 import { useState } from 'react';
 import { usePortal } from '../../app/providers/PortalProvider';
 import { useNavigate } from 'react-router-dom';
