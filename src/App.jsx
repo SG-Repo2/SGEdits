@@ -11,6 +11,7 @@ import { CoachDashboard } from './pages/coach/CoachDashboard';
 import { CoachStudents } from './pages/coach/CoachStudents';
 import { CoachDiagnostic } from './pages/coach/CoachDiagnostic';
 import { CoachSessionFlow } from './pages/coach/CoachSessionFlow';
+import { CoachScheduleBuilder } from './pages/coach/CoachScheduleBuilder';
 
 function RequireAuth({ children }) {
   const { session } = usePortal();
@@ -50,6 +51,7 @@ export default function App() {
             <Route path="coach/dashboard" element={<RequireRole role="coach"><CoachDashboard /></RequireRole>} />
             <Route path="coach/students" element={<RequireRole role="coach"><CoachStudents /></RequireRole>} />
             <Route path="coach/diagnostic" element={<RequireRole role="coach"><CoachDiagnostic /></RequireRole>} />
+            <Route path="coach/schedule-builder" element={<RequireRole role="coach"><CoachScheduleBuilder /></RequireRole>} />
             <Route path="coach/session-flow" element={<RequireRole role="coach"><CoachSessionFlow /></RequireRole>} />
           </Route>
           <Route path="*" element={<Navigate replace to="/" />} />
