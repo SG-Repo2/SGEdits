@@ -12,7 +12,7 @@ export function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     if (!email.trim() || !password.trim()) {
@@ -20,16 +20,13 @@ export function LoginPage() {
       return;
     }
     setLoading(true);
-    // Simulate tiny delay for feel
-    setTimeout(() => {
-      const result = loginWithCredentials(email.trim(), password);
-      if (result.success) {
-        navigate(result.profile.homePath || '/');
-      } else {
-        setError(result.error);
-        setLoading(false);
-      }
-    }, 300);
+    const result = await loginWithCredentials(email.trim(), password);
+    if (result.success) {
+      navigate(result.profile.homePath || '/');
+    } else {
+      setError(result.error);
+      setLoading(false);
+    }
   };
 
   return (
