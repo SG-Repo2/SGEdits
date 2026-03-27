@@ -20,21 +20,35 @@ import { CoachPlanningHub } from './pages/coach/CoachPlanningHub';
 
 const DataProvider = appConfig.isDemoMode ? PortalProvider : SupabaseProvider;
 
+const LoadingScreen = () => (
+  <div style={{
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    minHeight: '100vh', background: '#0a1f0f'
+  }}>
+    <div style={{ textAlign: 'center', color: '#c9a84c' }}>
+      <div style={{ fontSize: '1.2rem', letterSpacing: '0.1em' }}>Loading...</div>
+    </div>
+  </div>
+);
+
 function RequireAuth({ children }) {
-  const { session } = usePortal();
+  const { session, loading } = usePortal();
+  if (loading) return <LoadingScreen />;
   if (!session) return <Navigate replace to="/login" />;
   return children;
 }
 
 function RequireRole({ role, children }) {
-  const { session } = usePortal();
+  const { session, loading } = usePortal();
+  if (loading) return null;
   if (!session) return <Navigate replace to="/login" />;
   if (session.role !== role) return <Navigate replace to="/" />;
   return children;
 }
 
 function RoleRedirect() {
-  const { session } = usePortal();
+  const { session, loading } = usePortal();
+  if (loading) return null;
   if (!session) return <Navigate replace to="/login" />;
   if (session.role === 'coach') return <Navigate replace to="/coach/dashboard" />;
   return <Navigate replace to="/student/dashboard" />;
@@ -48,7 +62,6 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<RequireAuth><PortalLayout /></RequireAuth>}>
             <Route index element={<RoleRedirect />} />
-            {/* Student routes */}
             <Route path="student/dashboard" element={<RequireRole role="student"><StudentDashboard /></RequireRole>} />
             <Route path="student/weekly-plan" element={<RequireRole role="student"><StudentWeeklyPlan /></RequireRole>} />
             <Route path="student/sections" element={<RequireRole role="student"><StudentSections /></RequireRole>} />
@@ -56,7 +69,6 @@ export default function App() {
             <Route path="student/check-in" element={<RequireRole role="student"><StudentCheckIn /></RequireRole>} />
             <Route path="student/missed-questions" element={<RequireRole role="student"><StudentMissedQuestions /></RequireRole>} />
             <Route path="student/progress" element={<RequireRole role="student"><StudentProgress /></RequireRole>} />
-            {/* Coach routes */}
             <Route path="coach/dashboard" element={<RequireRole role="coach"><CoachDashboard /></RequireRole>} />
             <Route path="coach/students" element={<RequireRole role="coach"><CoachStudents /></RequireRole>} />
             <Route path="coach/diagnostic" element={<RequireRole role="coach"><CoachDiagnostic /></RequireRole>} />
