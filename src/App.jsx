@@ -1,5 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { appConfig } from './config/appConfig';
 import { PortalProvider, usePortal } from './app/providers/PortalProvider';
+import { SupabaseProvider } from './app/providers/SupabaseProvider';
 import { PortalLayout } from './layouts/PortalLayout';
 import { LoginPage } from './pages/auth/LoginPage';
 import { StudentDashboard } from './pages/student/StudentDashboard';
@@ -15,6 +17,8 @@ import { CoachDiagnostic } from './pages/coach/CoachDiagnostic';
 import { CoachSessionFlow } from './pages/coach/CoachSessionFlow';
 import { CoachScheduleBuilder } from './pages/coach/CoachScheduleBuilder';
 import { CoachPlanningHub } from './pages/coach/CoachPlanningHub';
+
+const DataProvider = appConfig.isDemoMode ? PortalProvider : SupabaseProvider;
 
 function RequireAuth({ children }) {
   const { session } = usePortal();
@@ -38,7 +42,7 @@ function RoleRedirect() {
 
 export default function App() {
   return (
-    <PortalProvider>
+    <DataProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -63,6 +67,6 @@ export default function App() {
           <Route path="*" element={<Navigate replace to="/" />} />
         </Routes>
       </BrowserRouter>
-    </PortalProvider>
+    </DataProvider>
   );
 }
