@@ -10,7 +10,7 @@ function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : {};
-  } catch {return {}; }
+  } catch { return {}; }
 }
 
 function saveState(state) {
@@ -67,40 +67,54 @@ export function PortalProvider({ children }) {
   const currentStudent = useMemo(
     () => (currentProfile?.studentId ? students.find(s => s.id === currentProfile.studentId) : null),
     [currentProfile, students]
-  
-  �(��
-�ۜ��YZ�T[�H\�SY[[�
+  );
 
-HO�Y�
-X�\��[��Y[�
-H�]\���[Y�
-�\��[��Y[��YOOH	�[�^YZ	�H�]\��[�^YZ�YZ�[��]\���[K��\��[��Y[�JN��ۜ�\��\�H\�P�[�X��
-\]\�HO��ۜ��\��[�H�Y�]J
-N�ۜ��^H�����\��[����\]\�N�]�T�]J�^
-NK�JN���8� 8� ]]�ܙY[�X[X�\�Y��[�8� 8� ��ۜ���[��]ܙY[�X[�H\�P�[�X��
-[XZ[\���ܙ
-HO��ۜ�ܙYHܙY[�X[˙�[�
-�O�˙[XZ[����\��\�J
-HOOH[XZ[����\��\�J
-H	��˜\���ܙOOH\���ܙ
-NY�
-XܙY
-H�]\����X��\�Έ�[�K\��܎�	�[��[Y[XZ[܈\���ܙ	�N��ۜ��ٚ[HH�ٚ[\˙�[�
-O��YOOHܙY��ٚ[RY
-NY�
-\�ٚ[JH�]\����X��\�Έ�[�K\��܎�	��ٚ[H����[�	�N��ۜ��^�\��[ۈH�ٚ[RY��ٚ[K�Y���N��ٚ[K���K��[YN��ٚ[K��[YK��Y[�Y��ٚ[K��Y[�Y�[�N�]�\��[ۊ�^�\��[ۊN\��\�
-��\��[ێ��^�\��[ۈJN�]\����X��\�Έ�YK�ٚ[HNK�ܙY[�X[��ٚ[\�\��\�JN���Y�X�N�\�X��ٚ[H��[�
-�[\�Y[�\��[JB��ۜ���[�\��ٚ[HH\�P�[�X��
-�ٚ[RY
-HO��ۜ��ٚ[HH�ٚ[\˙�[�
-O��YOOH�ٚ[RY
-NY�
-\�ٚ[JH�]\���[�ۜ��^�\��[ۈH��ٚ[RY��ٚ[K�Y��N��ٚ[K���K�[YN��ٚ[K��[YK�Y[�Y��ٚ[K��Y[�Y�[N�]�\��[ۊ�^�\��[ۊN\��\�
-��\��[ێ��^�\��[ۈJNK��ٚ[\�\��\�JN��ۜ����]H\�P�[�X��
+  const weeklyPlan = useMemo(() => {
+    if (!currentStudent) return null;
+    if (currentStudent.id === 'haniyeh') return haniyehWeekPlan;
+    return null;
+  }, [currentStudent]);
 
-HO��]�\��[ۊ�[
-N\��\�
-��\��[ێ��[JNK�\��\�JN��── Add Student ──
+  const persist = useCallback((updates) => {
+    const current = loadState();
+    const next = { ...current, ...updates };
+    saveState(next);
+  }, []);
+
+  // ── Auth: credential-based login ──
+  const loginWithCredentials = useCallback((email, password) => {
+    const cred = credentials.find(c => c.email.toLowerCase() === email.toLowerCase() && c.password === password);
+    if (!cred) return { success: false, error: 'Invalid email or password' };
+
+    const profile = profiles.find(p => p.id === cred.profileId);
+    if (!profile) return { success: false, error: 'Profile not found' };
+
+    const nextSession = {
+      profileId: profile.id,
+      role: profile.role,
+      name: profile.name,
+      studentId: profile.studentId || null,
+    };
+    setSession(nextSession);
+    persist({ session: nextSession });
+    return { success: true, profile };
+  }, [credentials, profiles, persist]);
+
+  // Legacy: direct profile login (still used internally)
+  const loginAsProfile = useCallback((profileId) => {
+    const profile = profiles.find(p => p.id === profileId);
+    if (!profile) return;
+    const nextSession = { profileId: profile.id, role: profile.role, name: profile.name, studentId: profile.studentId || null };
+    setSession(nextSession);
+    persist({ session: nextSession });
+  }, [profiles, persist]);
+
+  const logout = useCallback(() => {
+    setSession(null);
+    persist({ session: null });
+  }, [persist]);
+
+  // ── Add Student ──
   const addStudent = useCallback((studentData) => {
     const id = studentData.name.toLowerCase().replace(/[^a-z0-9]/g, '');
     const profileId = `student-${id}`;
