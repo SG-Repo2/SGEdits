@@ -6,4 +6,6 @@ export const appConfig = {
   supportEmail: 'portal@acethedat.com',
   dataSource,
   isDemoMode: dataSource !== 'supabase',
+  supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+  supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
 };
