@@ -17,13 +17,13 @@ export function CoachDashboard() {
       {/* Coach Header */}
       <div style={{ background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 'var(--r-xl)', padding: '32px 36px', marginBottom: 28 }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '2.5px', textTransform: 'uppercase', color: 'var(--gold-dim)', marginBottom: 16 }}>
-          Ace The DAT Â· Coaching OS
+          Ace The DAT · Coaching OS
         </div>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 700, color: 'var(--text-hi)', letterSpacing: '-0.5px', marginBottom: 6 }}>
           Welcome back, {session?.name || 'Coach'}
         </div>
         <div style={{ fontSize: 14, fontWeight: 300, color: 'var(--text-lo)', lineHeight: 1.6 }}>
-          {activeStudents.length} active student{activeStudents.length !== 1 ? 's' : ''} Â· {totalStudents} total enrolled
+          {activeStudents.length} active student{activeStudents.length !== 1 ? 's' : ''} · {totalStudents} total enrolled
         </div>
       </div>
 
@@ -119,11 +119,10 @@ export function CoachDashboard() {
           System Rule
         </div>
         <div style={{ fontSize: 13, color: 'var(--text-mid)', lineHeight: 1.7, fontWeight: 300 }}>
-          Every session must produce at least one logged insight â"not a student note, a pattern insight.
+          Every session must produce at least one logged insight — not a student note, a pattern insight.
           After 20 students, this database becomes your moat. No competitor can replicate it.
         </div>
       </div>
     </div>
   );
 }
-
