@@ -26,7 +26,7 @@ function ErrorCatBar({ errors }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
                 <span style={{ fontSize: 11, color: 'var(--text-mid)' }}>{cat.label}</span>
                 <span style={{ fontSize: 11, fontWeight: 700, color: pct > 30 ? cat.color : 'var(--text-lo)' }}>
-                  {pct}%{pct > 30 ? ' â¡' : ''}
+                  {pct}%{pct > 30 ? ' ⚡' : ''}
                 </span>
               </div>
               <div style={{ height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
@@ -134,16 +134,16 @@ export function CoachDiagnostic() {
             const fired = pct >= (thresholds[key] || 30);
             if (!fired) return null;
             const actions = {
-              1: 'Reteach fundamentals â content review before drilling',
-              2: 'Targeted correction drills â rebuild mental model from first principles',
-              3: 'Timed drills + protocol training â execution, not content',
-              4: 'Slow down protocol â enforce re-read before committing',
-              5: 'Pacing drills â enforce hard time caps per question',
+              1: 'Reteach fundamentals — content review before drilling',
+              2: 'Targeted correction drills — rebuild mental model from first principles',
+              3: 'Timed drills + protocol training — execution, not content',
+              4: 'Slow down protocol — enforce re-read before committing',
+              5: 'Pacing drills — enforce hard time caps per question',
             };
             return (
               <div key={key} style={{ marginBottom: 10, padding: '12px 14px', borderRadius: 10, background: cat.bg, border: `1px solid ${cat.color}30` }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: cat.color, marginBottom: 4 }}>
-                  â¡ {cat.label} â {pct}%
+                  ⚡ {cat.label} — {pct}%
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-mid)' }}>{actions[key]}</div>
               </div>
@@ -171,14 +171,14 @@ export function CoachDiagnostic() {
 
         {flash && (
           <div style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--success-bg)', border: '1px solid var(--success-border)', color: 'var(--success)', fontSize: 12, marginBottom: 12 }}>
-            â Error logged and classified.
+            ✓ Error logged and classified.
           </div>
         )}
 
         {showForm && (
           <div style={{ padding: 18, borderRadius: 12, background: 'var(--bg-panel-hover)', border: '1px solid var(--border)', marginBottom: 16 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gold)', marginBottom: 14, letterSpacing: '1px', textTransform: 'uppercase' }}>
-              Step 1 â Get Student Reasoning First
+              Step 1 — Get Student Reasoning First
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div>
@@ -198,7 +198,7 @@ export function CoachDiagnostic() {
               </div>
             </div>
             <div style={{ marginBottom: 12 }}>
-              <label className="form-label">Student's Reasoning (verbatim â before correction)</label>
+              <label className="form-label">Student's Reasoning (verbatim — before correction)</label>
               <textarea className="form-textarea" value={form.reasoning} onChange={e => setForm({ ...form, reasoning: e.target.value })}
                 placeholder="What did they say when asked to explain their thinking?" rows={2} />
             </div>
@@ -214,7 +214,7 @@ export function CoachDiagnostic() {
                   placeholder="Specific fix, not 'study more'" />
               </div>
             </div>
-            <button className="btn btn-gold" onClick={handleSubmitError}>Log Error â</button>
+            <button className="btn btn-gold" onClick={handleSubmitError}>Log Error →</button>
           </div>
         )}
 
@@ -232,7 +232,7 @@ export function CoachDiagnostic() {
                     {err.pattern && <span className="tag" style={{ background: cat?.bg, borderColor: `${cat?.color}30`, color: cat?.color }}>{err.pattern}</span>}
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-mid)', fontStyle: 'italic', marginBottom: 4 }}>"{err.reasoning}"</div>
-                  {err.intervention && <div style={{ fontSize: 12, color: 'var(--success)' }}>â³ {err.intervention}</div>}
+                  {err.intervention && <div style={{ fontSize: 12, color: 'var(--success)' }}>↳ {err.intervention}</div>}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{err.date}</div>
               </div>
@@ -281,7 +281,7 @@ export function CoachDiagnostic() {
               <textarea className="form-textarea" value={newInsight.fix} onChange={e => setNewInsight({ ...newInsight, fix: e.target.value })}
                 placeholder="Exact intervention that worked, not general advice" rows={2} />
             </div>
-            <button className="btn btn-gold" onClick={addInsight}>Save to Database â</button>
+            <button className="btn btn-gold" onClick={addInsight}>Save to Database →</button>
           </div>
         )}
 
@@ -309,4 +309,3 @@ export function CoachDiagnostic() {
     </div>
   );
 }
-
