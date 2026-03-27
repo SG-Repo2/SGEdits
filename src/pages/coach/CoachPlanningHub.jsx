@@ -42,7 +42,7 @@ function ScoreBar({ section, current, target }) {
         <span className="score-bar-section" style={{ color }}>{section}</span>
         <span className="score-bar-vals">
           <span className="score-current">{current}</span>
-          <span className="score-arrow">â</span>
+          <span className="score-arrow">→</span>
           <span className="score-target" style={{ color }}>{target}</span>
         </span>
       </div>
@@ -72,7 +72,7 @@ function PlanBlock({ block, onEdit }) {
         </div>
       )}
       {block.notes && <p className="plan-block-notes">{block.notes}</p>}
-      <button className="plan-block-edit-btn text-muted" onClick={() => onEdit(block)} title="Edit block">â</button>
+      <button className="plan-block-edit-btn text-muted" onClick={() => onEdit(block)} title="Edit block">✎</button>
     </div>
   );
 }
@@ -316,7 +316,7 @@ export default function CoachPlanningHub() {
             value={selectedStudentId || ''}
             onChange={e => { setSelectedStudentId(e.target.value || null); setPlan(null); }}
           >
-            <option value="">â Select a student â</option>
+            <option value="">— Select a student —</option>
             {myStudents.map(s => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
@@ -349,7 +349,7 @@ export default function CoachPlanningHub() {
             ))}
           </div>
 
-          {/* ââ PLAN TAB ââ */}
+          {/* ── PLAN TAB ── */}
           {activeTab === 'plan' && (
             <div className="plan-tab">
               {/* Student summary card */}
@@ -361,7 +361,7 @@ export default function CoachPlanningHub() {
                   </div>
                   <div className="ss-field">
                     <span className="ss-label">Test Date</span>
-                    <span className="ss-val">{selectedStudent.testDate ? formatDate(selectedStudent.testDate) : 'â'}</span>
+                    <span className="ss-val">{selectedStudent.testDate ? formatDate(selectedStudent.testDate) : '—'}</span>
                   </div>
                   <div className="ss-field">
                     <span className="ss-label">Weekly Hours</span>
@@ -378,7 +378,7 @@ export default function CoachPlanningHub() {
                 <div className="no-plan-area">
                   <p className="text-muted">No plan drafted yet for this student.</p>
                   <button className="btn-primary" onClick={handleGenerateDraft} disabled={isGenerating}>
-                    {isGenerating ? 'Generatingâ¦' : 'â¡ Generate Draft Plan'}
+                    {isGenerating ? 'Generating…' : '⚡ Generate Draft Plan'}
                   </button>
                 </div>
               ) : (
@@ -399,11 +399,11 @@ export default function CoachPlanningHub() {
                     </div>
                     <div className="plan-actions">
                       <button className="btn-ghost sm" onClick={() => setShowAddBlock(v => !v)}>
-                        {showAddBlock ? 'â Cancel' : '+ Add Block'}
+                        {showAddBlock ? '✕ Cancel' : '+ Add Block'}
                       </button>
-                      <button className="btn-ghost sm" onClick={handleGenerateDraft}>â» Regenerate</button>
+                      <button className="btn-ghost sm" onClick={handleGenerateDraft}>↻ Regenerate</button>
                       <button className="btn-primary sm" onClick={handleSavePlan} disabled={isSaving}>
-                        {isSaving ? 'Savingâ¦' : 'ð¾ Save Plan'}
+                        {isSaving ? 'Saving…' : '💾 Save Plan'}
                       </button>
                     </div>
                   </div>
@@ -465,7 +465,7 @@ export default function CoachPlanningHub() {
                     {plan.blocks.map(block => (
                       <div key={block.id} className="plan-block-wrapper">
                         <PlanBlock block={block} onEdit={handleEditBlock} />
-                        <button className="remove-block-btn text-muted" onClick={() => handleRemoveBlock(block.id)} title="Remove">â</button>
+                        <button className="remove-block-btn text-muted" onClick={() => handleRemoveBlock(block.id)} title="Remove">✕</button>
                       </div>
                     ))}
                   </div>
@@ -478,7 +478,7 @@ export default function CoachPlanningHub() {
                       value={plan.notes || ''}
                       onChange={e => setPlan(p => ({ ...p, notes: e.target.value }))}
                       rows={3}
-                      placeholder="Overall strategy, reminders, or instructions for this weekâ¦"
+                      placeholder="Overall strategy, reminders, or instructions for this week…"
                     />
                   </div>
                 </>
@@ -486,13 +486,13 @@ export default function CoachPlanningHub() {
             </div>
           )}
 
-          {/* ââ SCORES TAB ââ */}
+          {/* ── SCORES TAB ── */}
           {activeTab === 'scores' && (
             <div className="scores-tab">
               <div className="scores-header">
                 <h4>Score Overview</h4>
                 <p className="text-muted" style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
-                  Based on latest check-in. Scores on 200â600 scale.
+                  Based on latest check-in. Scores on 200–600 scale.
                 </p>
               </div>
 
@@ -554,7 +554,7 @@ export default function CoachPlanningHub() {
             </div>
           )}
 
-          {/* ââ HISTORY TAB ââ */}
+          {/* ── HISTORY TAB ── */}
           {activeTab === 'history' && (
             <div className="history-tab">
               {historicalPlans.length === 0 ? (
