@@ -76,7 +76,7 @@ export function StudentDashboard() {
           <div className="coach-avatar">T</div>
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1.8px', textTransform: 'uppercase', color: 'var(--gold-dim)' }}>
-              Coach Note â {currentStudent.phase}
+              Coach Note — {currentStudent.phase}
             </div>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-hi)', marginTop: 1 }}>Thomas Cordell</div>
           </div>
@@ -134,7 +134,7 @@ export function StudentDashboard() {
             const cc = TASK_CATEGORIES[task.cat] || TASK_CATEGORIES.Core;
             return (
               <div key={task.id} className="task-item" style={{ marginBottom: 4 }}>
-                <div className="task-check" onClick={() => toggleTask(task.id)}>â</div>
+                <div className="task-check" onClick={() => toggleTask(task.id)}>✓</div>
                 <span className="task-cat" style={{ background: cc.bg, borderColor: cc.border, color: cc.color }}>{task.cat}</span>
                 <span className="task-text">{task.text}</span>
                 <span style={{ fontSize: 10, color: 'var(--text-muted)', flexShrink: 0 }}>{task.dayLabel}</span>
@@ -148,7 +148,7 @@ export function StudentDashboard() {
       <div className="panel animate-in" style={{ animationDelay: '0.15s' }}>
         <div className="panel-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span className="panel-title">Today â {today?.label}</span>
+            <span className="panel-title">Today — {today?.label}</span>
             <span className="tag tag-gold">{todayDone}/{todayTasks.length}</span>
           </div>
           <button className="btn btn-ghost" style={{ padding: '5px 12px', fontSize: 11 }} onClick={() => navigate('/student/weekly-plan')}>
@@ -171,7 +171,7 @@ export function StudentDashboard() {
           const cc = TASK_CATEGORIES[task.cat] || TASK_CATEGORIES.Core;
           return (
             <div key={task.id} className={`task-item ${done ? 'done' : ''}`}>
-              <div className="task-check" onClick={() => toggleTask(task.id)}>{done ? 'â' : ''}</div>
+              <div className="task-check" onClick={() => toggleTask(task.id)}>{done ? '✓' : ''}</div>
               <span className="task-cat" style={{ background: cc.bg, borderColor: cc.border, color: cc.color }}>{task.cat}</span>
               <span className="task-text">{task.text}</span>
               {task.mins > 0 && <span style={{ fontSize: 10, color: 'var(--text-muted)', flexShrink: 0, fontFamily: 'monospace' }}>{task.mins}m</span>}
@@ -191,4 +191,3 @@ export function StudentDashboard() {
     </div>
   );
 }
-
