@@ -37,13 +37,13 @@ function SectionCard({ name, data }) {
           {data.approach.map((pt, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, marginBottom: 8, fontSize: 13, color: 'var(--text-mid)', lineHeight: 1.65, fontWeight: 300 }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, marginTop: 6, background: `${pt.color}99` }} />
-              <span dangerouslySetInnerHTML={{ __html: pt.text.replace(/^([^â]+â)/, '<strong style="color:var(--text-hi);font-weight:600">$1</strong>') }} />
+              <span dangerouslySetInnerHTML={{ __html: pt.text.replace(/^([^—]+—)/, '<strong style="color:var(--text-hi);font-weight:600">$1</strong>') }} />
             </div>
           ))}
         </div>
         {data.watch && (
           <div style={{ display: 'flex', gap: 9, padding: '11px 14px', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 9, fontSize: 12.5, color: 'var(--text-lo)', lineHeight: 1.7, fontWeight: 300 }}>
-            <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>â</span>
+            <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>⚑</span>
             <span><strong style={{ color: 'var(--text-mid)', fontWeight: 600 }}>Watch for:</strong> {data.watch}</span>
           </div>
         )}
@@ -65,4 +65,3 @@ export function StudentSections() {
     </div>
   );
 }
-
