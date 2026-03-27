@@ -48,7 +48,7 @@ export const demoStudents = [
     id: 'haniyeh', name: 'Haniyeh', initials: 'H', color: '#C9A84C',
     status: 'Active', program: 'Accelerator', phase: 'Week 1',
     targetScore: 23, testDate: '2026-06-15',
-    sections: { Bio: 17, GChem: 19, OChem: 14, PAT: 16, QR: 18, RCz 15 },
+    sections: { Bio: 17, GChem: 19, OChem: 14, PAT: 16, QR: 18, RC: 15 },
     predicted: 19, ceiling: 24,
     weakAreas: ['OChem mechanisms', 'RC passage mapping', 'PAT hole punching'],
     coachNote: `you've done the diagnostic — now we build. This week has two priorities: OChem and RC. OChem is where the gap is clearest. RC is newer ground, but the 5-step system will change how you read passages completely.\n\nWork the MQL every single day. When you miss a question, write the correct reasoning in your own words before you move on.`,
