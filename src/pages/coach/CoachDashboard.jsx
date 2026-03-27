@@ -7,21 +7,22 @@ export function CoachDashboard() {
   const { session, students, addStudent } = usePortal();
   const navigate = useNavigate();
   const [showAdd, setShowAdd] = useState(false);
-  const [newStudent, setNewStudent] = useState({ name: '', email: '', program: 'Accelerator', targetScore: 20, testDate: '' });
+  const [newStudent, setNewStudent] = useState({ name: '', email: '', program: 'Package', targetAA: 400, testDate: '' });
   const [justAdded, setJustAdded] = useState(null);
   const [copied, setCopied] = useState('');
 
   const activeStudents = students.filter(s => s.status === 'Active');
   const totalStudents = students.length;
-  const avgPredicted = totalStudents > 0 ? Math.round(students.reduce((a, s) => a + s.predicted, 0) / totalStudents) : 0;
-  const avgTarget = totalStudents > 0 ? Math.round(students.reduce((a, s) => a + s.targetScore, 0) / totalStudents) : 0;
+  const datStudents = students.filter(s => s.predicted > 0);
+  const avgPredicted = datStudents.length > 0 ? Math.round(datStudents.reduce((a, s) => a + s.predicted, 0) / datStudents.length) : 0;
+  const avgTarget = datStudents.length > 0 ? Math.round(datStudents.reduce((a, s) => a + (s.targetAA || 0), 0) / datStudents.length) : 0;
 
   const handleAdd = (e) => {
     e.preventDefault();
     if (!newStudent.name.trim() || !newStudent.email.trim()) return;
     const result = addStudent(newStudent);
     setJustAdded(result);
-    setNewStudent({ name: '', email: '', program: 'Accelerator', targetScore: 20, testDate: '' });
+    setNewStudent({ name: '', email: '', program: 'Package', targetAA: 400, testDate: '' });
   };
 
   const copyToClipboard = (text, label) => {
@@ -65,7 +66,7 @@ export function CoachDashboard() {
         </div>
         <div className="stat-card">
           <div className="stat-card-label">Gap to Close</div>
-          <div className="stat-card-value" style={{ color: avgTarget - avgPredicted > 3 ? 'var(--danger)' : 'var(--success)' }}>
+          <div className="stat-card-value" style={{ color: avgTarget - avgPredicted > 30 ? 'var(--danger)' : 'var(--success)' }}>
             {avgTarget - avgPredicted}
           </div>
           <div className="stat-card-sub">avg points</div>
@@ -91,7 +92,7 @@ export function CoachDashboard() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {students.map(student => {
-            const gap = student.targetScore - student.predicted;
+            const gap = (student.targetAA || 0) - (student.predicted || 0);
             return (
               <div key={student.id} style={{
                 padding: '16px 18px', borderRadius: 12,
@@ -124,7 +125,7 @@ export function CoachDashboard() {
                   <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--gold)', lineHeight: 1 }}>
                     {student.predicted || '\u2014'}
                   </div>
-                  <div style={{ fontSize: 11, color: gap > 3 ? 'var(--danger)' : gap > 0 ? 'var(--success)' : 'var(--text-muted)', marginTop: 3 }}>
+                  <div style={{ fontSize: 11, color: gap > 30 ? 'var(--danger)' : gap > 0 ? 'var(--success)' : 'var(--text-muted)', marginTop: 3 }}>
                     {student.predicted ? (gap > 0 ? `${gap} pts to go` : 'On target') : 'No data yet'}
                   </div>
                 </div>
@@ -162,7 +163,7 @@ export function CoachDashboard() {
               </button>
             </div>
 
-            {/* Success State — Show Credentials */}
+            {/* Success State â Show Credentials */}
             {justAdded ? (
               <div style={{ padding: '24px' }}>
                 <div style={{
@@ -207,7 +208,7 @@ export function CoachDashboard() {
                 }}>
                   <div>
                     <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Password</div>
-                    <div style={{ fontSize: 13, color: 'var(--text-hi)', fontFamily: 'monospace' }}>{justAdded.credentials.password}</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-hi)', fontFamily: 'monospace' }u>{justAdded.credentials.password}</div>
                   </div>
                   <button
                     onClick={() => copyToClipboard(justAdded.credentials.password, 'pw')}
@@ -281,22 +282,22 @@ export function CoachDashboard() {
                       onChange={e => setNewStudent(s => ({ ...s, program: e.target.value }))}
                       style={{ width: '100%', boxSizing: 'border-box' }}
                     >
-                      <option value="Accelerator">Accelerator</option>
-                      <option value="Elite Mastery">Elite Mastery</option>
-                      <option value="Foundation">Foundation</option>
+                      <option value="Package">Package</option>
+                      <option value="Hourly">Hourly</option>
                     </select>
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--text-lo)', marginBottom: 5 }}>
-                      Target Score
+                      Target AA (200-600)
                     </label>
                     <input
                       className="form-input"
                       type="number"
-                      min="15"
-                      max="30"
-                      value={newStudent.targetScore}
-                      onChange={e => setNewStudent(s => ({ ...s, targetScore: parseInt(e.target.value) || 20 }))}
+                      min="200"
+                      max="600"
+                      step="10"
+                      value={newStudent.targetAA}
+                      onChange={e => setNewStudent(s => ({ ...s, targetAA: parseInt(e.target.value) || 400 }))}
                       style={{ width: '100%', boxSizing: 'border-box' }}
                     />
                   </div>
