@@ -137,7 +137,7 @@ export function CoachDashboard() {
       {/* Add Student Modal */}
       {showAdd && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)),
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
           backdropFilter: 'blur(4px)'
         }} onClick={() => setShowAdd(false)}>
@@ -164,7 +164,7 @@ export function CoachDashboard() {
               </button>
             </div>
 
-               {/* Success State â Show Credentials */}
+               {/* Success State — Show Credentials */}
             {justAdded ? (
               <div style={{ padding: '24px' }}>
                 <div style={{
