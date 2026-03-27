@@ -22,7 +22,7 @@ export function StudentMQL() {
       {/* Header */}
       <div style={{ background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 'var(--r-xl)', padding: '32px 36px', marginBottom: 28 }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '2.5px', textTransform: 'uppercase', color: 'var(--gold-dim)', marginBottom: 16 }}>
-          Ace The DAT Â· Missed Question Log
+          Ace The DAT · Missed Question Log
         </div>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 700, color: 'var(--text-hi)', letterSpacing: '-0.5px', marginBottom: 6 }}>
           Missed Question Log
@@ -52,11 +52,11 @@ export function StudentMQL() {
           <span className="panel-title">How to use the MQL</span>
         </div>
         {[
-          { n: '01', title: 'Finish the test first â then open the MQL', body: 'Complete the section, then review. Separation helps you see patterns.' },
-          { n: '02', title: 'For each missed question â try it again cold', body: "Before looking at any explanation, figure out where your reasoning broke down." },
+          { n: '01', title: 'Finish the test first — then open the MQL', body: 'Complete the section, then review. Separation helps you see patterns.' },
+          { n: '02', title: 'For each missed question — try it again cold', body: "Before looking at any explanation, figure out where your reasoning broke down." },
           { n: '03', title: 'Assign the Error Type honestly', body: "Most students overclassify as Type A when it's actually C or D. Be ruthless." },
-          { n: '04', title: "Write the correct reasoning â don't copy the explanation", body: "If you can't explain it without looking, you don't own it yet." },
-          { n: '05', title: 'Flag the pattern â this is the most important field', body: "3rd+ time seeing this concept? It's PRIORITY. Bring it to Saturday." },
+          { n: '04', title: "Write the correct reasoning — don't copy the explanation", body: "If you can't explain it without looking, you don't own it yet." },
+          { n: '05', title: 'Flag the pattern — this is the most important field', body: "3rd+ time seeing this concept? It's PRIORITY. Bring it to Saturday." },
         ].map(step => (
           <div key={step.n} style={{ display: 'flex', gap: 13, padding: '13px 15px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-surface)', marginBottom: 7 }}>
             <div style={{ minWidth: 28, height: 28, borderRadius: 8, background: 'var(--info-bg)', border: '1px solid var(--info-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -84,7 +84,7 @@ export function StudentMQL() {
 
         {flash && (
           <div style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--success-bg)', border: '1px solid var(--success-border)', color: 'var(--success)', fontSize: 12, marginBottom: 12 }}>
-            â Error logged and classified.
+            ✓ Error logged and classified.
           </div>
         )}
 
@@ -124,7 +124,7 @@ export function StudentMQL() {
                   placeholder="What to do differently" />
               </div>
             </div>
-            <button className="btn btn-gold" onClick={handleSubmit}>Log Error â</button>
+            <button className="btn btn-gold" onClick={handleSubmit}>Log Error →</button>
           </div>
         )}
 
@@ -142,7 +142,7 @@ export function StudentMQL() {
                     {err.pattern && <span className="tag" style={{ background: cat?.bg, borderColor: `${cat?.color}30`, color: cat?.color }}>{err.pattern}</span>}
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-mid)', fontStyle: 'italic', marginBottom: 4 }}>"{err.reasoning}"</div>
-                  {err.intervention && <div style={{ fontSize: 12, color: 'var(--success)' }}>â³ {err.intervention}</div>}
+                  {err.intervention && <div style={{ fontSize: 12, color: 'var(--success)' }}>↳ {err.intervention}</div>}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{err.date}</div>
               </div>
@@ -158,4 +158,3 @@ export function StudentMQL() {
     </div>
   );
 }
-
