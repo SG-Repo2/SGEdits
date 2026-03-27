@@ -208,7 +208,7 @@ export function CoachDashboard() {
                 }}>
                   <div>
                     <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Password</div>
-                    <div style={{ fontSize: 13, color: 'var(--text-hi)', fontFamily: 'monospace' }u>{justAdded.credentials.password}</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-hi)', fontFamily: 'monospace' }>{justAdded.credentials.password}</div>
                   </div>
                   <button
                     onClick={() => copyToClipboard(justAdded.credentials.password, 'pw')}
