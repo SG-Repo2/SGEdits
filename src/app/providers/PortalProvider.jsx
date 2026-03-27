@@ -9,7 +9,7 @@ import {
 } from '../../data/seedData';
 import { appConfig } from '../../config/appConfig';
 
-export export const PortalContext = createContext(null);
+export const PortalContext = createContext(null);
 
 const STORAGE_KEY = 'acedat_portal_v2';
 
