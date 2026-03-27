@@ -7,7 +7,7 @@ export function StudentProgress() {
   if (!currentStudent || !weeklyPlan) return <div style={{ color: 'var(--text-lo)', padding: 40 }}>No data available.</div>;
 
   const allTasks = weeklyPlan.days.flatMap(d => d.tasks);
-  const totalDone = allTasks.filter(t => taskCompletion[t.id]).length;
+  const totalDone = allTasks.filter(t => taskCompletion[`${currentStudent?.id}:${t.id}`]).length;
   const totalTasks = allTasks.length;
   const weekPct = totalTasks > 0 ? Math.round(totalDone / totalTasks * 100) : 0;
 
@@ -15,18 +15,18 @@ export function StudentProgress() {
   const sectionStats = {};
   SECTIONS.forEach(sec => {
     const tasks = allTasks.filter(t => t.section === sec);
-    const done = tasks.filter(t => taskCompletion[t.id]).length;
+    const done = tasks.filter(t => taskCompletion[`${currentStudent?.id}:${t.id}`]).length;
     sectionStats[sec] = { total: tasks.length, done, pct: tasks.length > 0 ? Math.round(done / tasks.length * 100) : 0 };
   });
 
   // Daily completion
   const dayStats = weeklyPlan.days.map(d => {
-    const done = d.tasks.filter(t => taskCompletion[t.id]).length;
+    const done = d.tasks.filter(t => taskCompletion[`${currentStudent?.id}:${t.id}`]).length;
     return { label: d.short, done, total: d.tasks.length, pct: d.tasks.length > 0 ? Math.round(done / d.tasks.length * 100) : 0 };
   });
 
   const totalMins = allTasks.reduce((a, t) => a + (t.mins || 0), 0);
-  const doneMins = allTasks.filter(t => taskCompletion[t.id]).reduce((a, t) => a + (t.mins || 0), 0);
+  const doneMins = allTasks.filter(t => taskCompletion[`${currentStudent?.id}:${t.id}`]).reduce((a, t) => a + (t.mins || 0), 0);
   const daysComplete = dayStats.filter(d => d.total > 0 && d.done === d.total).length;
 
   return (
@@ -55,7 +55,7 @@ export function StudentProgress() {
         <div className="stat-card">
           <div className="stat-card-label">Predicted Score</div>
           <div className="stat-card-value" style={{ color: 'var(--gold)' }}>{currentStudent.predicted}</div>
-          <div className="stat-card-sub">Target: {currentStudent.targetScore}</div>
+          <div className="stat-card-sub">Target: {currentStudent.targetAA}</div>
         </div>
       </div>
 
@@ -72,7 +72,7 @@ export function StudentProgress() {
                 <div style={{ height: `${d.pct}%`, background: d.pct === 100 ? 'var(--success)' : 'var(--gold)', borderRadius: '4px 4px 0 0', transition: 'height 0.6s ease', minHeight: d.total > 0 ? 2 : 0 }} />
               </div>
               <div style={{ fontSize: 11, fontWeight: 700, color: d.pct === 100 ? 'var(--success)' : 'var(--text-mid)', marginTop: 6 }}>
-                {d.total === 0 ? '—' : `${d.pct}%`}
+                {d.total === 0 ? 'â' : `${d.pct}%`}
               </div>
             </div>
           ))}
@@ -107,7 +107,7 @@ export function StudentProgress() {
           <div key={sec} className="score-bar">
             <div className="score-bar-label">{sec}</div>
             <div className="score-bar-track">
-              <div className="score-bar-fill" style={{ width: `${(val / 30) * 100}%`, background: val >= 20 ? 'var(--success)' : val >= 17 ? 'var(--gold)' : 'var(--danger)' }} />
+              <div className="score-bar-fill" style={{ width: `${((val - 200) / 400) * 100}%`, background: val >= 400 ? 'var(--success)' : val >= 350 ? 'var(--gold)' : 'var(--danger)' }} />
             </div>
             <div className="score-bar-value">{val}</div>
           </div>
