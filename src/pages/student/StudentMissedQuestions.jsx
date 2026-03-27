@@ -674,3 +674,5 @@ export default function StudentMissedQuestions({ studentId }) {
     </div>
   );
 }
+
+export { StudentMissedQuestions };
