@@ -504,6 +504,27 @@ export function generateWeeklyDraft(student, mqlErrors = [], checkIns = {}, prev
     });
   }
 
+
+  // Generate section-level blocks for CoachPlanningHub compatibility
+  const BLOCK_SECTIONS = ['Bio', 'GChem', 'OChem', 'PAT', 'QR', 'RC'];
+  const hourDistribution = distributeHours(weeklyHours, sectionPriorities);
+  const blocks = BLOCK_SECTIONS.map(section => {
+    const mins = hourDistribution[section] || 0;
+    const hrs = Math.round((mins / 60) * 10) / 10;
+    const sp = sectionPriorities[section] || {};
+    const sectionErrs = mqlErrors.filter(e => e.section === section);
+    const topics = [...new Set(sectionErrs.map(e => e.subtopic || e.topic).filter(Boolean))].slice(0, 4);
+    return {
+      id: 'block-' + section.toLowerCase(),
+      section,
+      title: section,
+      hours: hrs,
+      priority: sp.priority || 'medium',
+      topics,
+      notes: '',
+    };
+  });
+
   // Build the final draft object
   const draft = {
     id: `draft-${studentId}-${weekId}`,
@@ -516,6 +537,10 @@ export function generateWeeklyDraft(student, mqlErrors = [], checkIns = {}, prev
     prioritySummary,
     focusAreas,
     coachSummary: '', // empty for coach to fill in
+    weekOf: weekStart,
+    weekNumber,
+    notes: coachNoteDraft,
+    blocks,
     carryover,
     sessionAgenda,
     coachNoteDraft,
