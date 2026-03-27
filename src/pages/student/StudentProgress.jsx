@@ -72,7 +72,7 @@ export function StudentProgress() {
                 <div style={{ height: `${d.pct}%`, background: d.pct === 100 ? 'var(--success)' : 'var(--gold)', borderRadius: '4px 4px 0 0', transition: 'height 0.6s ease', minHeight: d.total > 0 ? 2 : 0 }} />
               </div>
               <div style={{ fontSize: 11, fontWeight: 700, color: d.pct === 100 ? 'var(--success)' : 'var(--text-mid)', marginTop: 6 }}>
-                {d.total === 0 ? 'â' : `${d.pct}%`}
+                {d.total === 0 ? '—' : `${d.pct}%`}
               </div>
             </div>
           ))}
@@ -116,4 +116,3 @@ export function StudentProgress() {
     </div>
   );
 }
-
