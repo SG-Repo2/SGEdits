@@ -141,7 +141,7 @@ function EditBlockModal({ block, onSave, onCancel }) {
 }
 
 export default function CoachPlanningHub() {
-  const { students, currentUser, addWeeklyPlan, updateWeeklyPlan } = usePortal() || {};
+  const { students, currentProfile: currentUser, saveWeeklyPlan, weeklyPlans: allWeeklyPlans } = usePortal() || {};
 
   const myStudents = useMemo(() => {
     if (!students) return [];
@@ -266,10 +266,8 @@ export default function CoachPlanningHub() {
     setIsSaving(true);
     try {
       const planToSave = { ...plan, studentId: selectedStudent.id, savedAt: new Date().toISOString() };
-      if (plan.id && updateWeeklyPlan) {
-        await updateWeeklyPlan(selectedStudent.id, plan.id, planToSave);
-      } else if (addWeeklyPlan) {
-        await addWeeklyPlan(selectedStudent.id, planToSave);
+      if (saveWeeklyPlan) {
+        await saveWeeklyPlan(selectedStudent.id, planToSave);
       }
       setSavedMsg('Plan saved!');
       setTimeout(() => setSavedMsg(''), 2500);
@@ -297,9 +295,10 @@ export default function CoachPlanningHub() {
   }, [plan]);
 
   const historicalPlans = useMemo(() => {
-    if (!selectedStudent) return [];
-    return (selectedStudent.weeklyPlans || []).sort((a, b) => new Date(b.weekOf) - new Date(a.weekOf));
-  }, [selectedStudent]);
+    if (!selectedStudentId || !allWeeklyPlans) return [];
+    const p = allWeeklyPlans[selectedStudentId];
+    return p ? [p] : [];
+  }, [selectedStudentId, allWeeklyPlans]);
 
   return (
     <div className="cph-page">
