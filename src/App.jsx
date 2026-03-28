@@ -1,7 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { appConfig } from './config/appConfig';
-import { PortalProvider, usePortal } from './app/providers/PortalProvider';
-import { SupabaseProvider } from './app/providers/SupabaseProvider';
+import { SupabaseProvider, usePortal } from './app/providers/SupabaseProvider';
 import { PortalLayout } from './layouts/PortalLayout';
 import { LoginPage } from './pages/auth/LoginPage';
 import { StudentDashboard } from './pages/student/StudentDashboard';
@@ -18,13 +16,8 @@ import { CoachSessionFlow } from './pages/coach/CoachSessionFlow';
 import { CoachScheduleBuilder } from './pages/coach/CoachScheduleBuilder';
 import { CoachPlanningHub } from './pages/coach/CoachPlanningHub';
 
-const DataProvider = appConfig.isDemoMode ? PortalProvider : SupabaseProvider;
-
 const LoadingScreen = () => (
-  <div style={{
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    minHeight: '100vh', background: '#0a1f0f'
-  }}>
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#0a1f0f' }}>
     <div style={{ textAlign: 'center', color: '#c9a84c' }}>
       <div style={{ fontSize: '1.2rem', letterSpacing: '0.1em' }}>Loading...</div>
     </div>
@@ -56,7 +49,7 @@ function RoleRedirect() {
 
 export default function App() {
   return (
-    <DataProvider>
+    <SupabaseProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -79,6 +72,6 @@ export default function App() {
           <Route path="*" element={<Navigate replace to="/" />} />
         </Routes>
       </BrowserRouter>
-    </DataProvider>
+    </SupabaseProvider>
   );
 }
