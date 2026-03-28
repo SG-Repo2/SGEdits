@@ -49,7 +49,7 @@ function AddStudentModal({ onClose, onAdd }) {
     setError(''); setLoading(true);
     const res = await onAdd(form);
     setLoading(false);
-    if (!res.success) { setError(res.error || 'Failed to create student.'); } else { setResult({ tempPassword: res.tempPassword, name: form.name }); }
+    if (!res.success) { setError(res.error || 'Failed to create student.'); } else { setResult({ tempPassword: res.tempPassword, authUserCreated: res.authUserCreated !== false, name: form.name }); }
   };
   const copyPassword = () => {
     if (result?.tempPassword) { navigator.clipboard.writeText(result.tempPassword); setCopied(true); setTimeout(() => setCopied(false), 2000); }
