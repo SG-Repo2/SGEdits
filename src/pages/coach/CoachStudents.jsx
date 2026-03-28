@@ -16,9 +16,7 @@ function ScoreBar({ section, value, max = 600, color, onEdit }) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <div style={{ fontSize: 12, color: 'var(--text-lo)', minWidth: 60 }}>{section}</div>
-        <input type="number" min="0" max={max} value={newValue} onChange={e => setNewValue(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSave()}
-          style={{ width: 50, padding: '4px 6px', borderRadius: 4, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-hi)', fontSize: 12 }} />
+        <input type="number" min="0" max={max} value={newValue} onChange={e => setNewValue(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSave()} style={{ width: 50, padding: '4px 6px', borderRadius: 4, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-hi)', fontSize: 12 }} />
         <button onClick={handleSave} style={{ padding: '4px 8px', background: 'var(--gold)', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--text-dark)' }}>Save</button>
         <button onClick={() => setEditing(false)} style={{ padding: '4px 8px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', fontSize: 12, color: 'var(--text-mid)' }}>Cancel</button>
       </div>
@@ -34,16 +32,17 @@ function ScoreBar({ section, value, max = 600, color, onEdit }) {
 }
 
 const PROGRAMS = ['Full DAT','DAT Biology','DAT General Chemistry','DAT Organic Chemistry','Mixed/Full DAT','Post-DAT Application','Strategy/Schedule'];
-const PHASES   = ['Foundation','Practice','Peak','Test Week','Post-DAT'];
+const PHASES = ['Foundation','Practice','Peak','Test Week','Post-DAT'];
 
 function AddStudentModal({ onClose, onAdd }) {
   const [form, setForm] = useState({ name:'', email:'', phone:'', testDate:'', targetAA:22, program:'Full DAT', phase:'Foundation' });
-  const [loading,  setLoading]  = useState(false);
-  const [result,   setResult]   = useState(null);
-  const [error,    setError]    = useState('');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
   const [showPass, setShowPass] = useState(false);
-  const [copied,   setCopied]   = useState(false);
+  const [copied, setCopied] = useState(false);
   const set = (field, val) => setForm(prev => ({ ...prev, [field]: val }));
+
   const handleSubmit = async () => {
     if (!form.name.trim()) { setError('Name is required.'); return; }
     if (!form.email.trim() || !form.email.includes('@')) { setError('Valid email is required.'); return; }
@@ -53,13 +52,22 @@ function AddStudentModal({ onClose, onAdd }) {
     if (!res.success) { setError(res.error || 'Failed to create student.'); }
     else { setResult({ tempPassword: res.tempPassword, name: form.name }); }
   };
+
   const copyPassword = () => {
-    if (result?.tempPassword) { navigator.clipboard.writeText(result.tempPassword); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+    if (result?.tempPassword) {
+      navigator.clipboard.writeText(result.tempPassword);
+      setCopied(true); setTimeout(() => setCopied(false), 2000);
+    }
   };
+
   const inp = { padding: '9px 12px', borderRadius: 6, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-hi)', fontSize: 13, width: '100%', boxSizing: 'border-box' };
+
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: 'var(--bg-panel)', borderRadius: 16, padding: 28, width: '100%', maxWidth: 480, border: '1px solid var(--border)', maxHeight: '90vh', overflowY: 'auto' }}>
+    <div
+      onClick={e => e.target === e.currentTarget && onClose()}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 9999, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 20px', overflowY: 'auto' }}
+    >
+      <div style={{ background: 'var(--bg-panel)', borderRadius: 16, padding: 28, width: '100%', maxWidth: 480, border: '1px solid var(--border)', flexShrink: 0 }}>
         {!result ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 }}>
@@ -134,24 +142,28 @@ function StudentProfile({ student }) {
   const [addingFocusTag, setAddingFocusTag] = useState(false);
   const [newFocusTag, setNewFocusTag] = useState('');
   const { mqlErrors, updateStudent, updateStudentSections, weeklyPlans } = usePortal();
-  const sections   = student.sections || {};
-  const weakAreas  = student.weakAreas || [];
-  const focusTags  = student.focusTags || [];
+  const sections = student.sections || {};
+  const weakAreas = student.weakAreas || [];
+  const focusTags = student.focusTags || [];
   const hasSections = Object.keys(sections).length > 0;
   const sectionAvg = hasSections ? Math.round(Object.values(sections).reduce((a, b) => a + (b || 0), 0) / Object.keys(sections).length) : 0;
-  const gap    = (student.targetAA || 22) - (student.predicted || 0);
+  const gap = (student.targetAA || 22) - (student.predicted || 0);
   const hasPlan = !!(weeklyPlans || {})[student.id];
   const studentErrors = (mqlErrors || []).filter(e => e.studentId === student.id);
+
   const handleSaveNote = () => { updateStudent(student.id, { coachNote: noteValue }); setEditingNote(false); };
   const handleAddWeakArea = () => { if (newWeakArea.trim()) { updateStudent(student.id, { weakAreas: [...weakAreas, newWeakArea.trim()] }); setNewWeakArea(''); setAddingWeakArea(false); } };
   const handleRemoveWeakArea = (area) => { updateStudent(student.id, { weakAreas: weakAreas.filter(a => a !== area) }); };
   const handleAddFocusTag = () => { if (newFocusTag.trim()) { updateStudent(student.id, { focusTags: [...focusTags, newFocusTag.trim()] }); setNewFocusTag(''); setAddingFocusTag(false); } };
   const handleRemoveFocusTag = (tag) => { updateStudent(student.id, { focusTags: focusTags.filter(t => t !== tag) }); };
   const handleSectionScore = (section, newValue) => { updateStudentSections(student.id, { ...sections, [section]: newValue }); };
+
   const testDateCountdown = (() => {
     if (!student.testDate) return null;
     const diff = Math.round((new Date(student.testDate) - new Date()) / (1000 * 60 * 60 * 24));
-    if (diff < 0) return 'Passed'; if (diff === 0) return 'TODAY'; return `${diff}d`;
+    if (diff < 0) return 'Passed';
+    if (diff === 0) return 'TODAY';
+    return `${diff}d`;
   })();
 
   return (
@@ -255,10 +267,11 @@ function StudentProfile({ student }) {
 
 export function CoachStudents() {
   const { students, addStudent, loading } = usePortal();
-  const [showAddModal, setShowAddModal]   = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
   const safeStudents = Array.isArray(students) ? students : [];
+
   const handleAdd = useCallback(async (formData) => {
-    if (!addStudent) return { success: false, error: 'addStudent not available in this mode.' };
+    if (!addStudent) return { success: false, error: 'addStudent not available.' };
     return await addStudent(formData);
   }, [addStudent]);
 
@@ -273,6 +286,7 @@ export function CoachStudents() {
           <UserPlus size={15} /> Add Student
         </button>
       </div>
+
       {loading && <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>Loading students…</div>}
       {!loading && safeStudents.length === 0 && (
         <div className="panel" style={{ textAlign: 'center', padding: 48 }}>
@@ -282,8 +296,9 @@ export function CoachStudents() {
           <button onClick={() => setShowAddModal(true)} style={{ padding: '10px 24px', background: 'var(--gold)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700, color: 'var(--text-dark)' }}>Add First Student</button>
         </div>
       )}
+
       {safeStudents.map(student => <StudentProfile key={student.id} student={student} />)}
       {showAddModal && <AddStudentModal onClose={() => setShowAddModal(false)} onAdd={handleAdd} />}
     </div>
   );
-                  }
+}
