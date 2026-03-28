@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { SECTIONS, ERROR_CATEGORIES } from '../../data/seedData';
 import { usePortal } from '../../app/providers/PortalProvider';
 import { ChevronDown, Edit, X, Plus, Check, UserPlus, Copy, Eye, EyeOff } from 'lucide-react';
@@ -42,30 +43,25 @@ function AddStudentModal({ onClose, onAdd }) {
   const [showPass, setShowPass] = useState(false);
   const [copied, setCopied] = useState(false);
   const set = (field, val) => setForm(prev => ({ ...prev, [field]: val }));
-
   const handleSubmit = async () => {
     if (!form.name.trim()) { setError('Name is required.'); return; }
     if (!form.email.trim() || !form.email.includes('@')) { setError('Valid email is required.'); return; }
     setError(''); setLoading(true);
     const res = await onAdd(form);
     setLoading(false);
-    if (!res.success) { setError(res.error || 'Failed to create student.'); }
-    else { setResult({ tempPassword: res.tempPassword, name: form.name }); }
+    if (!res.success) { setError(res.error || 'Failed to create student.'); } else { setResult({ tempPassword: res.tempPassword, name: form.name }); }
   };
-
   const copyPassword = () => {
-    if (result?.tempPassword) {
-      navigator.clipboard.writeText(result.tempPassword);
-      setCopied(true); setTimeout(() => setCopied(false), 2000);
-    }
+    if (result?.tempPassword) { navigator.clipboard.writeText(result.tempPassword); setCopied(true); setTimeout(() => setCopied(false), 2000); }
   };
-
   const inp = { padding: '9px 12px', borderRadius: 6, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-hi)', fontSize: 13, width: '100%', boxSizing: 'border-box' };
 
-  return (
+  return createPortal(
     <div
       onClick={e => e.target === e.currentTarget && onClose()}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 9999, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 20px', overflowY: 'auto' }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 9999,
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        padding: '40px 20px', overflowY: 'auto' }}
     >
       <div style={{ background: 'var(--bg-panel)', borderRadius: 16, padding: 28, width: '100%', maxWidth: 480, border: '1px solid var(--border)', flexShrink: 0 }}>
         {!result ? (
@@ -129,7 +125,8 @@ function AddStudentModal({ onClose, onAdd }) {
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -150,14 +147,12 @@ function StudentProfile({ student }) {
   const gap = (student.targetAA || 22) - (student.predicted || 0);
   const hasPlan = !!(weeklyPlans || {})[student.id];
   const studentErrors = (mqlErrors || []).filter(e => e.studentId === student.id);
-
   const handleSaveNote = () => { updateStudent(student.id, { coachNote: noteValue }); setEditingNote(false); };
   const handleAddWeakArea = () => { if (newWeakArea.trim()) { updateStudent(student.id, { weakAreas: [...weakAreas, newWeakArea.trim()] }); setNewWeakArea(''); setAddingWeakArea(false); } };
   const handleRemoveWeakArea = (area) => { updateStudent(student.id, { weakAreas: weakAreas.filter(a => a !== area) }); };
   const handleAddFocusTag = () => { if (newFocusTag.trim()) { updateStudent(student.id, { focusTags: [...focusTags, newFocusTag.trim()] }); setNewFocusTag(''); setAddingFocusTag(false); } };
   const handleRemoveFocusTag = (tag) => { updateStudent(student.id, { focusTags: focusTags.filter(t => t !== tag) }); };
   const handleSectionScore = (section, newValue) => { updateStudentSections(student.id, { ...sections, [section]: newValue }); };
-
   const testDateCountdown = (() => {
     if (!student.testDate) return null;
     const diff = Math.round((new Date(student.testDate) - new Date()) / (1000 * 60 * 60 * 24));
@@ -165,7 +160,6 @@ function StudentProfile({ student }) {
     if (diff === 0) return 'TODAY';
     return `${diff}d`;
   })();
-
   return (
     <div className={`sec-card ${open ? 'open' : ''}`} style={{ borderColor: `${student.color || '#C9A84C'}30`, marginBottom: 12 }}>
       <div className="sec-card-header" onClick={() => setOpen(!open)} style={{ background: `${student.color || '#C9A84C'}08` }}>
@@ -269,12 +263,10 @@ export function CoachStudents() {
   const { students, addStudent, loading } = usePortal();
   const [showAddModal, setShowAddModal] = useState(false);
   const safeStudents = Array.isArray(students) ? students : [];
-
   const handleAdd = useCallback(async (formData) => {
     if (!addStudent) return { success: false, error: 'addStudent not available.' };
     return await addStudent(formData);
   }, [addStudent]);
-
   return (
     <div className="animate-in">
       <div className="section-header" style={{ marginBottom: 20 }}>
@@ -286,7 +278,6 @@ export function CoachStudents() {
           <UserPlus size={15} /> Add Student
         </button>
       </div>
-
       {loading && <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>Loading students…</div>}
       {!loading && safeStudents.length === 0 && (
         <div className="panel" style={{ textAlign: 'center', padding: 48 }}>
@@ -296,9 +287,8 @@ export function CoachStudents() {
           <button onClick={() => setShowAddModal(true)} style={{ padding: '10px 24px', background: 'var(--gold)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700, color: 'var(--text-dark)' }}>Add First Student</button>
         </div>
       )}
-
       {safeStudents.map(student => <StudentProfile key={student.id} student={student} />)}
       {showAddModal && <AddStudentModal onClose={() => setShowAddModal(false)} onAdd={handleAdd} />}
     </div>
   );
-}
+                    }
