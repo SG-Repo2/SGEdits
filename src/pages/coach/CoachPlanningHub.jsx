@@ -141,14 +141,12 @@ function EditBlockModal({ block, onSave, onCancel }) {
 }
 
 export default function CoachPlanningHub() {
-  const { students, currentProfile: currentUser, saveWeeklyPlan, weeklyPlans: allWeeklyPlans } = usePortal() || {};
+  const { students, saveWeeklyPlan, weeklyPlans: allWeeklyPlans } = usePortal() || {};
 
   const myStudents = useMemo(() => {
     if (!students) return [];
-    return students.filter(s =>
-      !currentUser || s.coachId === currentUser.id || currentUser.role === 'admin'
-    );
-  }, [students, currentUser]);
+    return students;
+  }, [students]);
 
   const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [activeTab, setActiveTab] = useState('plan'); // 'plan' | 'scores' | 'history'
