@@ -307,7 +307,7 @@ export function SupabaseProvider({ children }) {
   const addStudent = useCallback(async (studentData) => {
     const res = await fetch('/.netlify/functions/create-student', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ((await supabase.auth.getSession()).data?.session?.access_token || '') },
       body: JSON.stringify({
         name:      studentData.name,
         email:     studentData.email,
@@ -326,7 +326,7 @@ export function SupabaseProvider({ children }) {
     }
     const { data: studentsData } = await supabase.from('students').select('*').order('name');
     if (mounted.current && studentsData) setStudents(studentsData.map(rowToStudent));
-    return { success: true, tempPassword: result.tempPassword, student: result.student };
+    return { success: true, tempPassword: result.tempPassword, authUserCreated: result.authUserCreated, student: result.student };
   }, []);
 
   const updateStudent = useCallback(async (studentId, updates) => {
