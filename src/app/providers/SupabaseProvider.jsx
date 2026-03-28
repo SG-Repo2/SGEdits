@@ -1,82 +1,182 @@
-import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
-import { supabase } from '../../lib/supabase';
+/**
+ * SupabaseProvider — Live data provider for AceDAT Portal
+ *
+ * Exposes the SAME context API as PortalProvider so all
+ * pages work identically in demo or live mode.
+ *
+ * CRITICAL: onAuthStateChange fires inside the Supabase Web Lock.
+ * Calling supabase.* inside that callback → same-lock re-entrance → deadlock.
+ * All supabase work is deferred via setTimeout(fn, 0).
+ */
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+} from 'react';
+import { supabase } from '../../lib/supabase/client';
 import { appConfig } from '../../config/appConfig';
-import { PortalContext } from './PortalProvider';
 
-// ── Row mappers ──────────────────────────────────────────────────────────────
+const PortalContext = createContext(null);
 
-function rowToStudent(r) {
+// ── Row → JS object converters ──────────────────────────────────
+
+function rowToStudent(row) {
+  if (!row) return null;
   return {
-    id: r.id,
-    name: r.name,
-    email: r.email || '',
-    initials: r.initials || '',
-    color: r.color || '#C9A84C',
-    status: r.status || 'Active',
-    program: r.program || '',
-    testDate: r.test_date || '',
-    targetAA: r.target_aa || 400,
-    targetSections: r.target_sections || {},
-    sections: r.sections || {},
-    weeklyStudyHours: r.weekly_study_hours || 20,
-    constraints: r.constraints || '',
-    sessionCadence: r.session_cadence || 'Weekly',
-    predicted: r.predicted || null,
-    coach: r.coach || '',
-    avatar: r.avatar || null,
+    id:          row.id,
+    name:        row.name || '',
+    email:       row.email || '',
+    initials:    row.initials || (row.name ? row.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() : '??'),
+    color:       row.color || '#C9A84C',
+    phone:       row.phone || '',
+    targetAA:    row.target_aa ?? 22,
+    predicted:   row.predicted ?? null,
+    sections:    row.sections || { Bio: 0, GC: 0, OC: 0, RC: 0, QR: 0, PAT: 0, TS: 0 },
+    program:     row.program || 'Full DAT',
+    phase:       row.phase || 'Foundation',
+    testDate:    row.test_date || null,
+    coachNote:   row.coach_note || '',
+    weakAreas:   row.weak_areas || [],
+    focusTags:   row.focus_tags || [],
+    ceiling:     row.ceiling ?? null,
+    coachId:     row.coach_id || null,
   };
 }
 
-function rowToMqlError(r) {
+function rowToProfile(row) {
+  if (!row) return null;
   return {
-    id: r.id,
-    studentId: r.student_id,
-    section: r.section || '',
-    subtopic: r.subtopic || '',
-    source: r.source || '',
-    examNumber: r.exam_number || '',
-    questionNumber: r.question_number || '',
-    errorType: r.error_type || '',
-    confidenceBefore: r.confidence_before || 0,
-    whyMissed: r.why_missed || '',
-    takeaway: r.takeaway || '',
-    reviewed: r.reviewed || false,
-    stillWeak: r.still_weak || false,
-    includeInNextPlan: r.include_in_next_plan || false,
-    date: r.date || '',
+    id:        row.id,
+    role:      row.role || 'student',
+    name:      row.name || '',
+    studentId: row.student_id || null,
+    homePath:  row.home_path || (row.role === 'coach' ? '/coach/dashboard' : '/student/dashboard'),
+    label:     row.label || `${row.name || ''} Portal`,
   };
 }
 
-function rowToWeeklyPlan(r) {
+function rowToCheckIn(row) {
+  if (!row) return null;
   return {
-    id: r.id,
-    studentId: r.student_id,
-    weekOf: r.week_of || '',
-    weekNumber: r.week_number || 1,
-    notes: r.notes || '',
-    blocks: r.blocks || [],
-    status: r.status || 'draft',
-    publishedAt: r.published_at || null,
+    id:          row.id,
+    studentId:   row.student_id,
+    weekId:      row.week_id || '',
+    submittedAt: row.submitted_at || row.created_at,
+    ...(row.data || {}),
   };
 }
 
-// ── Provider ─────────────────────────────────────────────────────────────────
+function rowToWeeklyPlan(row) {
+  if (!row) return null;
+  const planData = row.plan_data || {};
+  return {
+    id:          row.id,
+    studentId:   row.student_id,
+    weekStart:   row.week_start || planData.weekStart || null,
+    status:      row.status || 'draft',
+    publishedAt: row.published_at || null,
+    ...planData,
+  };
+}
+
+function rowToMqlError(row) {
+  if (!row) return null;
+  return {
+    id:                row.id,
+    studentId:         row.student_id,
+    date:              row.date || row.created_at?.split('T')[0] || '',
+    section:           row.section || '',
+    subtopic:          row.subtopic || '',
+    source:            row.source || '',
+    examNumber:        row.exam_number || '',
+    questionNumber:    row.question_number || '',
+    errorType:         row.error_type || '',
+    confidenceBefore:  row.confidence_before ?? 0,
+    whyMissed:         row.why_missed || '',
+    takeaway:          row.takeaway || '',
+    reviewed:          row.reviewed || false,
+    stillWeak:         row.still_weak || false,
+    includeInNextPlan: row.include_in_next_plan || false,
+    category:          row.category || '',
+  };
+}
+
+// ── Provider ────────────────────────────────────────────
 
 export function SupabaseProvider({ children }) {
-  const [session, setSession] = useState(null);
-  const [students, setStudents] = useState([]);
-  const [mqlErrors, setMqlErrors] = useState([]);
-  const [checkIns, setCheckIns] = useState({});
-  const [weeklyPlans, setWeeklyPlans] = useState({});
-  const [taskCompletion, setTaskCompletion] = useState({});
-  const [notes, setNotes] = useState({});
-  const [insights, setInsights] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const mounted = useRef(true);
 
-  // ── Data loader ───────────────────────────────────────────────────────────
+  const [session, setSession]               = useState(null);
+  const [currentProfile, setCurrentProfile] = useState(null);
+  const [currentStudent, setCurrentStudent] = useState(null);
+  const [students, setStudents]             = useState([]);
+  const [mqlErrors, setMqlErrors]           = useState([]);
+  const [checkIns, setCheckIns]             = useState({});
+  const [weeklyPlans, setWeeklyPlans]       = useState({});
+  const [taskCompletion, setTaskCompletion] = useState({});
+  const [notes, setNotes]                   = useState({});
+  const [insights, setInsights]             = useState([]);
+  const [loading, setLoading]               = useState(true);
+
+  const resolveSession = useCallback(async (user) => {
+    if (!user || !mounted.current) return;
+
+    const { data: profileRow } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (!mounted.current) return;
+
+    if (!profileRow) {
+      console.warn('[SupabaseProvider] No profile found for user', user.id);
+      setCurrentProfile(null);
+      setCurrentStudent(null);
+      return;
+    }
+
+    const profile = rowToProfile(profileRow);
+    setCurrentProfile(profile);
+
+    setSession({
+      profileId: profile.id,
+      role:      profile.role,
+      name:      profile.name,
+      studentId: profile.studentId || null,
+    });
+
+    if (profile.studentId) {
+      const { data: studentRow } = await supabase
+        .from('students')
+        .select('*')
+        .eq('id', profile.studentId)
+        .single();
+
+      if (mounted.current && studentRow) {
+        setCurrentStudent(rowToStudent(studentRow));
+      }
+    } else {
+      if (mounted.current) setCurrentStudent(null);
+    }
+  }, []);
 
   const loadAllData = useCallback(async () => {
-    const [studRes, mqlRes, ciRes, planRes, taskRes, noteRes, insRes] = await Promise.all([
+    if (!mounted.current) return;
+
+    const [
+      { data: studentsData },
+      { data: mqlData },
+      { data: checkInData },
+      { data: plansData },
+      { data: taskData },
+      { data: notesData },
+      { data: insightsData },
+    ] = await Promise.all([
       supabase.from('students').select('*').order('name'),
       supabase.from('mql_errors').select('*').order('created_at', { ascending: false }),
       supabase.from('check_ins').select('*').order('submitted_at', { ascending: false }),
@@ -86,331 +186,346 @@ export function SupabaseProvider({ children }) {
       supabase.from('insights').select('*').order('created_at', { ascending: false }),
     ]);
 
-    if (studRes.data) setStudents(studRes.data.map(rowToStudent));
+    if (!mounted.current) return;
 
-    if (mqlRes.data) setMqlErrors(mqlRes.data.map(rowToMqlError));
+    if (studentsData) setStudents(studentsData.map(rowToStudent));
+    if (mqlData) setMqlErrors(mqlData.map(rowToMqlError));
 
-    if (ciRes.data) {
+    if (checkInData) {
       const map = {};
-      ciRes.data.forEach(r => {
-        map[`${r.student_id}:${r.week_id}`] = {
-          ...(r.data || {}),
-          studentId: r.student_id,
-          weekId: r.week_id,
-          submittedAt: r.submitted_at,
-        };
+      checkInData.forEach(row => {
+        const ci = rowToCheckIn(row);
+        if (ci) map[`${ci.studentId}:${ci.weekId || row.id}`] = ci;
       });
       setCheckIns(map);
     }
 
-    if (planRes.data) {
+    if (plansData) {
       const map = {};
-      planRes.data.forEach(r => {
-        if (!map[r.student_id]) map[r.student_id] = rowToWeeklyPlan(r);
+      plansData.forEach(row => {
+        const plan = rowToWeeklyPlan(row);
+        if (!plan) return;
+        const sid = plan.studentId;
+        if (!map[sid] || map[sid].status !== 'published') map[sid] = plan;
       });
       setWeeklyPlans(map);
     }
 
-    if (taskRes.data) {
+    if (taskData) {
       const map = {};
-      taskRes.data.forEach(r => { map[`${r.student_id}:${r.task_id}`] = r.completed; });
+      taskData.forEach(row => {
+        if (row.student_id && row.task_id) map[`${row.student_id}:${row.task_id}`] = !!row.completed;
+      });
       setTaskCompletion(map);
     }
 
-    if (noteRes.data) {
+    if (notesData) {
       const map = {};
-      noteRes.data.forEach(r => { map[`${r.student_id}:${r.day_id}`] = r.content; });
+      notesData.forEach(row => {
+        if (row.student_id && (row.day_id || row.id)) {
+          map[`${row.student_id}:${row.day_id || row.id}`] = row.note_text || row.content || '';
+        }
+      });
       setNotes(map);
     }
 
-    if (insRes.data) setInsights(insRes.data);
-  }, []);
-
-  // ── Auth init ─────────────────────────────────────────────────────────────
-
-  const resolveSession = useCallback(async (authUser) => {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', authUser.id)
-      .single();
-    if (profile) {
-      setSession({
-        profileId: profile.id,
-        role: profile.role,
-        name: profile.name,
-        studentId: profile.student_id || null,
-      });
-    }
+    if (insightsData) setInsights(insightsData);
+    if (mounted.current) setLoading(false);
   }, []);
 
   useEffect(() => {
-    let mounted = true;
-    supabase.auth.getSession().then(async ({ data: { session: s } }) => {
-      if (!mounted) return;
-      if (s?.user) {
-        await resolveSession(s.user);
-        await loadAllData();
+    mounted.current = true;
+
+    supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
+      if (existingSession?.user && mounted.current) {
+        resolveSession(existingSession.user).then(() => {
+          if (mounted.current) loadAllData();
+        });
+      } else if (mounted.current) {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
+    // CRITICAL: onAuthStateChange fires inside the Supabase Web Lock.
+    // Do NOT call supabase.* inside this callback directly.
+    // Defer ALL supabase work via setTimeout(fn, 0) to escape the lock.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
-      // IMPORTANT: This callback fires inside the supabase auth lock.
-      // Do NOT await supabase calls here — they deadlock (same-lock re-entrance).
-      // Defer all supabase work outside the lock via setTimeout.
       if (event === 'SIGNED_IN' && s?.user) {
         const user = s.user;
         setTimeout(async () => {
-          if (mounted) {
+          if (mounted.current) {
             await resolveSession(user);
-            await loadAllData();
+            loadAllData();
           }
         }, 0);
       } else if (event === 'SIGNED_OUT') {
-        setSession(null);
-        setStudents([]);
-        setMqlErrors([]);
-        setCheckIns({});
-        setWeeklyPlans({});
-        setTaskCompletion({});
-        setNotes({});
-        setInsights([]);
+        if (mounted.current) {
+          setSession(null);
+          setCurrentProfile(null);
+          setCurrentStudent(null);
+          setStudents([]);
+          setMqlErrors([]);
+          setCheckIns({});
+          setWeeklyPlans({});
+          setTaskCompletion({});
+          setNotes({});
+          setInsights([]);
+          setLoading(false);
+        }
       }
     });
 
-    return () => { mounted = false; subscription.unsubscribe(); };
+    return () => {
+      mounted.current = false;
+      subscription.unsubscribe();
+    };
   }, [resolveSession, loadAllData]);
-
-  // ── Derived state ─────────────────────────────────────────────────────────
-
-  const currentProfile = useMemo(() => {
-    if (!session) return null;
-    return { id: session.profileId, role: session.role, name: session.name, studentId: session.studentId };
-  }, [session]);
-
-  const currentStudent = useMemo(() => {
-    if (!session?.studentId) return null;
-    return students.find(s => s.id === session.studentId) || null;
-  }, [session, students]);
-
-  const coachName = useMemo(() => session?.role === 'coach' ? session.name : null, [session]);
 
   const weeklyPlan = useMemo(() => {
     if (!currentStudent) return null;
     return weeklyPlans[currentStudent.id] || null;
   }, [currentStudent, weeklyPlans]);
 
-  // ── Auth actions ──────────────────────────────────────────────────────────
-
   const loginWithCredentials = useCallback(async (email, password) => {
+    setLoading(true);
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { success: false, error: error.message };
-    const { data: profile } = await supabase
-      .from('profiles').select('*').eq('id', data.user.id).single();
-    if (!profile) return { success: false, error: 'Profile not found' };
-    const nextSession = { profileId: profile.id, role: profile.role, name: profile.name, studentId: profile.student_id || null };
-    setSession(nextSession);
-    loadAllData(); // non-blocking — data loads in background
-    return { success: true, profile: { ...profile, homePath: profile.home_path } };
-  }, [loadAllData]);
+    if (error) {
+      setLoading(false);
+      return { success: false, error: error.message };
+    }
+    return { success: true, profile: data.user };
+  }, []);
 
-  const loginAsProfile = useCallback(() => {}, []);
+  const loginAsProfile = useCallback(() => {
+    console.warn('[SupabaseProvider] loginAsProfile not supported in live mode');
+  }, []);
 
   const logout = useCallback(async () => {
     await supabase.auth.signOut();
-    setSession(null);
   }, []);
 
-  // ── Student actions ───────────────────────────────────────────────────────
-
   const addStudent = useCallback(async (studentData) => {
-    const id = studentData.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const row = {
-      id,
-      name: studentData.name,
-      email: studentData.email || null,
-      initials: studentData.name.charAt(0).toUpperCase() + (studentData.name.split(' ')[1]?.charAt(0).toUpperCase() || ''),
-      color: studentData.color || '#C9A84C',
-      status: 'Active',
-      program: studentData.program || 'Package',
-      test_date: studentData.testDate || null,
-      target_aa: studentData.targetAA || 400,
-      target_sections: studentData.targetSections || {},
-      sections: studentData.sections || {},
-      weekly_study_hours: studentData.weeklyStudyHours || 20,
-      constraints: studentData.constraints || null,
-      session_cadence: studentData.sessionCadence || 'Weekly',
-    };
-    const { data } = await supabase.from('students').insert([row]).select().single();
-    if (data) setStudents(prev => [...prev, rowToStudent(data)]);
-    return data ? { student: rowToStudent(data) } : null;
+    const res = await fetch('/.netlify/functions/create-student', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name:      studentData.name,
+        email:     studentData.email,
+        phone:     studentData.phone || '',
+        testDate:  studentData.testDate || null,
+        targetAA:  studentData.targetAA || 22,
+        program:   studentData.program || 'Full DAT',
+        weakAreas: studentData.weakAreas || [],
+        coachId:   studentData.coachId || null,
+        sections:  studentData.sections || {},
+      }),
+    });
+    const result = await res.json();
+    if (!res.ok || result.error) {
+      return { success: false, error: result.error || 'Failed to create student' };
+    }
+    const { data: studentsData } = await supabase.from('students').select('*').order('name');
+    if (mounted.current && studentsData) setStudents(studentsData.map(rowToStudent));
+    return { success: true, tempPassword: result.tempPassword, student: result.student };
   }, []);
 
   const updateStudent = useCallback(async (studentId, updates) => {
-    const rowUpdates = {};
-    const map = { testDate: 'test_date', targetAA: 'target_aa', targetSections: 'target_sections', sections: 'sections', weeklyStudyHours: 'weekly_study_hours', sessionCadence: 'session_cadence' };
-    Object.entries(updates).forEach(([k, v]) => { rowUpdates[map[k] || k] = v; });
-    await supabase.from('students').update(rowUpdates).eq('id', studentId);
-    setStudents(prev => prev.map(s => s.id === studentId ? { ...s, ...updates } : s));
-  }, []);
+    const dbUpdates = {};
+    const fieldMap = {
+      name: 'name', email: 'email', phone: 'phone',
+      testDate: 'test_date', targetAA: 'target_aa', predicted: 'predicted',
+      sections: 'sections', program: 'program', phase: 'phase',
+      coachNote: 'coach_note', weakAreas: 'weak_areas', focusTags: 'focus_tags',
+      ceiling: 'ceiling', coachId: 'coach_id', color: 'color', initials: 'initials',
+    };
+    Object.entries(updates).forEach(([k, v]) => { if (fieldMap[k]) dbUpdates[fieldMap[k]] = v; });
+    if (Object.keys(dbUpdates).length === 0) return;
 
-  const updateStudentSections = useCallback(async (studentId, sections) => {
-    await supabase.from('students').update({ sections }).eq('id', studentId);
-    setStudents(prev => prev.map(s => s.id === studentId ? { ...s, sections } : s));
-  }, []);
+    const { data, error } = await supabase
+      .from('students').update(dbUpdates).eq('id', studentId).select().single();
 
-  // ── MQL Errors ────────────────────────────────────────────────────────────
+    if (error) { console.error('[SupabaseProvider] updateStudent error:', error); return; }
 
-  const addMqlError = useCallback(async (error) => {
-    if (!currentStudent) return;
-    const row = { id: `mql-${Date.now()}`, student_id: currentStudent.id, section: error.section || '', subtopic: error.subtopic || '', source: error.source || '', exam_number: error.examNumber || '', question_number: error.questionNumber || '', error_type: error.errorType || '', confidence_before: error.confidenceBefore || 0, why_missed: error.whyMissed || '', takeaway: error.takeaway || '', reviewed: false, still_weak: false, include_in_next_plan: false, date: new Date().toISOString().split('T')[0] };
-    const { data } = await supabase.from('mql_errors').insert([row]).select().single();
-    if (data) setMqlErrors(prev => [rowToMqlError(data), ...prev]);
+    if (mounted.current && data) {
+      const updated = rowToStudent(data);
+      setStudents(prev => prev.map(s => s.id === studentId ? updated : s));
+      if (currentStudent?.id === studentId) setCurrentStudent(updated);
+    }
   }, [currentStudent]);
 
-  const addMqlErrorForStudent = useCallback(async (studentId, error) => {
-    const row = { id: `mql-${Date.now()}`, student_id: studentId, section: error.section || '', subtopic: error.subtopic || '', source: error.source || '', exam_number: error.examNumber || '', question_number: error.questionNumber || '', error_type: error.errorType || '', confidence_before: error.confidenceBefore || 0, why_missed: error.whyMissed || '', takeaway: error.takeaway || '', reviewed: false, still_weak: false, include_in_next_plan: false, date: new Date().toISOString().split('T')[0] };
-    const { data } = await supabase.from('mql_errors').insert([row]).select().single();
-    if (data) setMqlErrors(prev => [rowToMqlError(data), ...prev]);
-  }, []);
-
-  const updateMqlError = useCallback(async (errorId, updates) => {
-    const map = { stillWeak: 'still_weak', includeInNextPlan: 'include_in_next_plan', whyMissed: 'why_missed', errorType: 'error_type' };
-    const rowUpdates = {};
-    Object.entries(updates).forEach(([k, v]) => { rowUpdates[map[k] || k] = v; });
-    await supabase.from('mql_errors').update(rowUpdates).eq('id', errorId);
-    setMqlErrors(prev => prev.map(e => e.id === errorId ? { ...e, ...updates } : e));
-  }, []);
-
-  const deleteMqlError = useCallback(async (errorId) => {
-    await supabase.from('mql_errors').delete().eq('id', errorId);
-    setMqlErrors(prev => prev.filter(e => e.id !== errorId));
-  }, []);
-
-  // ── Tasks & Notes ─────────────────────────────────────────────────────────
+  const updateStudentSections = useCallback(async (studentId, sections) => {
+    await updateStudent(studentId, { sections });
+  }, [updateStudent]);
 
   const toggleTask = useCallback(async (taskId) => {
     if (!currentStudent) return;
     const key = `${currentStudent.id}:${taskId}`;
-    const newVal = !taskCompletion[key];
-    await supabase.from('task_completions').upsert({ student_id: currentStudent.id, task_id: taskId, completed: newVal }, { onConflict: 'student_id,task_id' });
-    setTaskCompletion(prev => ({ ...prev, [key]: newVal }));
+    const next = !taskCompletion[key];
+    setTaskCompletion(prev => ({ ...prev, [key]: next }));
+    await supabase.from('task_completions').upsert(
+      { student_id: currentStudent.id, task_id: taskId, completed: next },
+      { onConflict: 'student_id,task_id' }
+    );
   }, [currentStudent, taskCompletion]);
 
   const saveNote = useCallback(async (dayId, text) => {
     if (!currentStudent) return;
     const key = `${currentStudent.id}:${dayId}`;
-    await supabase.from('student_notes').upsert({ student_id: currentStudent.id, day_id: dayId, content: text, updated_at: new Date().toISOString() }, { onConflict: 'student_id,day_id' });
     setNotes(prev => ({ ...prev, [key]: text }));
+    await supabase.from('student_notes').upsert(
+      { student_id: currentStudent.id, day_id: dayId, note_text: text },
+      { onConflict: 'student_id,day_id' }
+    );
   }, [currentStudent]);
 
-  // ── Check-ins ─────────────────────────────────────────────────────────────
+  const addMqlError = useCallback(async (error) => {
+    if (!currentStudent) return;
+    const row = {
+      student_id: currentStudent.id, date: new Date().toISOString().split('T')[0],
+      section: error.section || '', subtopic: error.subtopic || '',
+      source: error.source || '', exam_number: error.examNumber || '',
+      question_number: error.questionNumber || '', error_type: error.errorType || '',
+      confidence_before: error.confidenceBefore || 0, why_missed: error.whyMissed || '',
+      takeaway: error.takeaway || '', reviewed: error.reviewed || false,
+      still_weak: error.stillWeak || false, include_in_next_plan: error.includeInNextPlan || false,
+      category: error.category || '',
+    };
+    const { data } = await supabase.from('mql_errors').insert(row).select().single();
+    if (data && mounted.current) setMqlErrors(prev => [rowToMqlError(data), ...prev]);
+  }, [currentStudent]);
+
+  const addMqlErrorForStudent = useCallback(async (studentId, error) => {
+    const row = {
+      student_id: studentId, date: new Date().toISOString().split('T')[0],
+      section: error.section || '', subtopic: error.subtopic || '',
+      source: error.source || '', exam_number: error.examNumber || '',
+      question_number: error.questionNumber || '', error_type: error.errorType || '',
+      confidence_before: error.confidenceBefore || 0, why_missed: error.whyMissed || '',
+      takeaway: error.takeaway || '', reviewed: error.reviewed || false,
+      still_weak: error.stillWeak || false, include_in_next_plan: error.includeInNextPlan || false,
+      category: error.category || '',
+    };
+    const { data } = await supabase.from('mql_errors').insert(row).select().single();
+    if (data && mounted.current) setMqlErrors(prev => [rowToMqlError(data), ...prev]);
+  }, []);
+
+  const updateMqlError = useCallback(async (errorId, updates) => {
+    const dbUpdates = {};
+    if ('reviewed' in updates)          dbUpdates.reviewed = updates.reviewed;
+    if ('stillWeak' in updates)         dbUpdates.still_weak = updates.stillWeak;
+    if ('includeInNextPlan' in updates) dbUpdates.include_in_next_plan = updates.includeInNextPlan;
+    if ('takeaway' in updates)          dbUpdates.takeaway = updates.takeaway;
+    if ('category' in updates)          dbUpdates.category = updates.category;
+    await supabase.from('mql_errors').update(dbUpdates).eq('id', errorId);
+    if (mounted.current) setMqlErrors(prev => prev.map(e => e.id === errorId ? { ...e, ...updates } : e));
+  }, []);
+
+  const deleteMqlError = useCallback(async (errorId) => {
+    await supabase.from('mql_errors').delete().eq('id', errorId);
+    if (mounted.current) setMqlErrors(prev => prev.filter(e => e.id !== errorId));
+  }, []);
 
   const submitCheckIn = useCallback(async (studentId, weekId, data) => {
     const row = { student_id: studentId, week_id: weekId, data, submitted_at: new Date().toISOString() };
-    await supabase.from('check_ins').upsert(row, { onConflict: 'student_id,week_id' });
-    const key = `${studentId}:${weekId}`;
-    setCheckIns(prev => ({ ...prev, [key]: { ...data, studentId, weekId, submittedAt: row.submitted_at } }));
+    const { data: saved } = await supabase
+      .from('check_ins').upsert(row, { onConflict: 'student_id,week_id' }).select().single();
+    if (saved && mounted.current) {
+      const ci = rowToCheckIn(saved);
+      setCheckIns(prev => ({ ...prev, [`${ci.studentId}:${ci.weekId}`]: ci }));
+    }
   }, []);
 
   const getCheckIns = useCallback((studentId) => {
     return Object.entries(checkIns)
-      .filter(([k]) => k.startsWith(`${studentId}:`))
+      .filter(([key]) => key.startsWith(`${studentId}:`))
       .map(([, v]) => v)
       .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
   }, [checkIns]);
 
   const getLatestCheckIn = useCallback((studentId) => {
-    const all = getCheckIns(studentId);
+    const all = Object.entries(checkIns)
+      .filter(([key]) => key.startsWith(`${studentId}:`))
+      .map(([, v]) => v)
+      .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
     return all[0] || null;
-  }, [getCheckIns]);
-
-  // ── Weekly Plans ──────────────────────────────────────────────────────────
+  }, [checkIns]);
 
   const saveWeeklyPlan = useCallback(async (studentId, plan) => {
-    const existing = weeklyPlans[studentId];
-    const row = { student_id: studentId, week_of: plan.weekOf || '', week_number: plan.weekNumber || 1, notes: plan.notes || '', blocks: plan.blocks || [], status: plan.status || 'draft', updated_at: new Date().toISOString() };
-    if (existing?.id) {
-      await supabase.from('weekly_plans').update(row).eq('id', existing.id);
-      setWeeklyPlans(prev => ({ ...prev, [studentId]: { ...prev[studentId], ...plan } }));
+    const { days, weekLabel, title, weekStart, status, ...rest } = plan;
+    const planData = { days, weekLabel, title, weekStart, ...rest };
+    const row = {
+      student_id: studentId,
+      week_start: weekStart || new Date().toISOString().split('T')[0],
+      status: status || 'draft',
+      plan_data: planData,
+    };
+    let saved;
+    if (plan.id && !plan.id.startsWith('wp-local-')) {
+      const { data } = await supabase.from('weekly_plans').update({ ...row, plan_data: planData }).eq('id', plan.id).select().single();
+      saved = data;
     } else {
-      const { data } = await supabase.from('weekly_plans').insert([row]).select().single();
-      if (data) setWeeklyPlans(prev => ({ ...prev, [studentId]: rowToWeeklyPlan(data) }));
+      const { data } = await supabase.from('weekly_plans').insert(row).select().single();
+      saved = data;
     }
-  }, [weeklyPlans]);
+    if (saved && mounted.current) setWeeklyPlans(prev => ({ ...prev, [studentId]: rowToWeeklyPlan(saved) }));
+  }, []);
 
   const getWeeklyPlan = useCallback((studentId) => weeklyPlans[studentId] || null, [weeklyPlans]);
 
-  const publishWeeklyPlan = useCallback(async (studentId) => {
-    const existing = weeklyPlans[studentId];
-    if (!existing?.id) return;
-    const publishedAt = new Date().toISOString();
-    await supabase.from('weekly_plans').update({ status: 'published', published_at: publishedAt }).eq('id', existing.id);
-    setWeeklyPlans(prev => ({ ...prev, [studentId]: { ...prev[studentId], status: 'published', publishedAt } }));
+  const publishWeeklyPlan = useCallback(async (studentId, planId) => {
+    const plan = weeklyPlans[studentId];
+    if (!plan) return;
+    const id = planId || plan.id;
+    await supabase.from('weekly_plans').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', id);
+    if (mounted.current) {
+      setWeeklyPlans(prev => ({ ...prev, [studentId]: { ...prev[studentId], status: 'published', publishedAt: new Date().toISOString() } }));
+    }
   }, [weeklyPlans]);
 
-  // ── Insights ──────────────────────────────────────────────────────────────
-
   const addInsight = useCallback(async (insight) => {
-    const row = { id: insight.id || `insight-${Date.now()}`, student_id: insight.studentId || null, content: insight.content || '', type: insight.type || '', created_at: insight.createdAt || new Date().toISOString() };
-    const { data } = await supabase.from('insights').insert([row]).select().single();
-    if (data) setInsights(prev => [data, ...prev]);
+    const { data } = await supabase.from('insights').insert({ ...insight, created_at: new Date().toISOString() }).select().single();
+    if (data && mounted.current) setInsights(prev => [data, ...prev]);
   }, []);
 
   const updateInsight = useCallback(async (insightId, updates) => {
-    await supabase.from('insights').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', insightId);
-    setInsights(prev => prev.map(i => i.id === insightId ? { ...i, ...updates } : i));
+    await supabase.from('insights').update(updates).eq('id', insightId);
+    if (mounted.current) setInsights(prev => prev.map(i => i.id === insightId ? { ...i, ...updates } : i));
   }, []);
 
-  // ── Context value ─────────────────────────────────────────────────────────
-
   const value = useMemo(() => ({
-    mode: appConfig.dataSource,
-    isDemoMode: false,
-    loading,
-    session,
-    profiles: [],
-    students,
-    credentials: [],
-    currentProfile,
-    currentStudent,
-    coachName,
-    weeklyPlan,
-    weeklyPlans,
-    insights,
-    taskCompletion,
-    notes,
-    mqlErrors,
-    checkIns,
-    loginWithCredentials,
-    loginAsProfile,
-    logout,
-    addStudent,
-    updateStudent,
-    updateStudentSections,
-    toggleTask,
-    saveNote,
-    addMqlError,
-    addMqlErrorForStudent,
-    updateMqlError,
-    deleteMqlError,
-    submitCheckIn,
-    getCheckIns,
-    getLatestCheckIn,
-    saveWeeklyPlan,
-    getWeeklyPlan,
-    publishWeeklyPlan,
-    addInsight,
-    updateInsight,
+    mode: appConfig.dataSource, isDemoMode: false,
+    session, loading, currentProfile, currentStudent,
+    weeklyPlan, weeklyPlans, students, mqlErrors, checkIns,
+    taskCompletion, notes, insights,
+    loginWithCredentials, loginAsProfile, logout,
+    addStudent, updateStudent, updateStudentSections,
+    toggleTask, saveNote,
+    addMqlError, addMqlErrorForStudent, updateMqlError, deleteMqlError,
+    submitCheckIn, getCheckIns, getLatestCheckIn,
+    saveWeeklyPlan, getWeeklyPlan, publishWeeklyPlan,
+    addInsight, updateInsight,
   }), [
-    loading, session, students, currentProfile, currentStudent, coachName,
-    weeklyPlan, weeklyPlans, insights, taskCompletion, notes, mqlErrors, checkIns,
-    loginWithCredentials, logout, addStudent, updateStudent, updateStudentSections,
-    toggleTask, saveNote, addMqlError, addMqlErrorForStudent, updateMqlError, deleteMqlError,
-    submitCheckIn, getCheckIns, getLatestCheckIn, saveWeeklyPlan, getWeeklyPlan,
-    publishWeeklyPlan, addInsight, updateInsight,
+    session, loading, currentProfile, currentStudent,
+    weeklyPlan, weeklyPlans, students, mqlErrors, checkIns,
+    taskCompletion, notes, insights,
+    loginWithCredentials, loginAsProfile, logout,
+    addStudent, updateStudent, updateStudentSections,
+    toggleTask, saveNote,
+    addMqlError, addMqlErrorForStudent, updateMqlError, deleteMqlError,
+    submitCheckIn, getCheckIns, getLatestCheckIn,
+    saveWeeklyPlan, getWeeklyPlan, publishWeeklyPlan,
+    addInsight, updateInsight,
   ]);
 
-  return <PortalContext.Provider value={value}>{children}</PortalContext.Provider>;
+  return (
+    <PortalContext.Provider value={value}>
+      {children}
+    </PortalContext.Provider>
+  );
+}
+
+export function usePortal() {
+  const ctx = useContext(PortalContext);
+  if (!ctx) throw new Error('usePortal must be used inside SupabaseProvider');
+  return ctx;
 }
