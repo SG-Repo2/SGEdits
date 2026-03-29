@@ -461,10 +461,12 @@ export function SupabaseProvider({ children }) {
     };
     let saved;
     if (plan.id && !plan.id.startsWith('wp-local-')) {
-      const { data } = await supabase.from('weekly_plans').update({ ...row, plan_data: planData }).eq('id', plan.id).select().single();
+      const { data, error: upErr } = await supabase.from('weekly_plans').update({ ...row, plan_data: planData }).eq('id', plan.id).select().single();
+      if (upErr) throw new Error(upErr.message || 'Plan save failed');
       saved = data;
     } else {
-      const { data } = await supabase.from('weekly_plans').insert(row).select().single();
+      const { data, error: insErr } = await supabase.from('weekly_plans').insert(row).select().single();
+      if (insErr) throw new Error(insErr.message || 'Plan save failed');
       saved = data;
     }
     if (saved && mounted.current) setWeeklyPlans(prev => ({ ...prev, [studentId]: rowToWeeklyPlan(saved) }));
