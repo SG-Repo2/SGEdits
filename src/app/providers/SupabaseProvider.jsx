@@ -117,6 +117,7 @@ export function SupabaseProvider({ children }) {
   const [mqlErrors, setMqlErrors]           = useState([]);
   const [checkIns, setCheckIns]             = useState({});
   const [weeklyPlans, setWeeklyPlans]       = useState({});
+  const [weeklyPlanHistory, setWeeklyPlanHistory] = useState({}); // keyed by studentId → Plan[]
   const [taskCompletion, setTaskCompletion] = useState({});
   const [notes, setNotes]                   = useState({});
   const [insights, setInsights]             = useState([]);
@@ -209,6 +210,17 @@ export function SupabaseProvider({ children }) {
         if (!map[sid] || map[sid].status !== 'published') map[sid] = plan;
       });
       setWeeklyPlans(map);
+        // Also build full history map: studentId → all plans sorted newest-first
+        const histMap = {};
+        plansData.forEach(row => {
+          const plan = rowToWeeklyPlan(row);
+          if (!plan) return;
+          const sid = plan.studentId;
+          if (!histMap[sid]) histMap[sid] = [];
+          histMap[sid].push(plan);
+        });
+        Object.keys(histMap).forEach(sid => histMap[sid].sort((a, b) => new Date(b.weekStart || b.savedAt) - new Date(a.weekStart || a.savedAt)));
+        setWeeklyPlanHistory(histMap);
     }
 
     if (taskData) {
@@ -470,6 +482,13 @@ export function SupabaseProvider({ children }) {
       saved = data;
     }
     if (saved && mounted.current) setWeeklyPlans(prev => ({ ...prev, [studentId]: rowToWeeklyPlan(saved) }));
+    // Also prepend to history map
+    if (saved && mounted.current) {
+      setWeeklyPlanHistory(prev => {
+        const existing = (prev[studentId] || []).filter(p => p.id !== saved.id);
+        return { ...prev, [studentId]: [rowToWeeklyPlan(saved), ...existing] };
+      });
+    }
   }, []);
 
   const getWeeklyPlan = useCallback((studentId) => weeklyPlans[studentId] || null, [weeklyPlans]);
@@ -497,7 +516,7 @@ export function SupabaseProvider({ children }) {
   const value = useMemo(() => ({
     mode: appConfig.dataSource, isDemoMode: false,
     session, loading, currentProfile, currentStudent,
-    weeklyPlan, weeklyPlans, students, mqlErrors, checkIns,
+    weeklyPlanHistory, weeklyPlan, weeklyPlans, students, mqlErrors, checkIns,
     taskCompletion, notes, insights,
     loginWithCredentials, loginAsProfile, logout,
     addStudent, updateStudent, updateStudentSections,
