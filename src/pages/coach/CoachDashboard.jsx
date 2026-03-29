@@ -11,16 +11,16 @@ export function CoachDashboard() {
   const [justAdded, setJustAdded] = useState(null);
   const [copied, setCopied] = useState('');
 
-  const activeStudents = students.filter(s => s.status === 'Active');
+  const activeStudents = students;
   const totalStudents = students.length;
   const datStudents = students.filter(s => s.predicted > 0);
   const avgPredicted = datStudents.length > 0 ? Math.round(datStudents.reduce((a, s) => a + s.predicted, 0) / datStudents.length) : 0;
   const avgTarget = datStudents.length > 0 ? Math.round(datStudents.reduce((a, s) => a + (s.targetAA || 0), 0) / datStudents.length) : 0;
 
-  const handleAdd = (e) => {
+  const handleAdd = async (e) => {
     e.preventDefault();
     if (!newStudent.name.trim() || !newStudent.email.trim()) return;
-    const result = addStudent(newStudent);
+    const result = await addStudent(newStudent);
     setJustAdded(result);
     setNewStudent({ name: '', email: '', program: 'Package', targetAA: 400, testDate: '' });
   };
@@ -190,10 +190,10 @@ export function CoachDashboard() {
                 }}>
                   <div>
                     <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Email</div>
-                    <div style={{ fontSize: 13, color: 'var(--text-hi)', fontFamily: 'monospace' }}>{justAdded.credentials.email}</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-hi)', fontFamily: 'monospace' }}>{justAdded.student?.email}</div>
                   </div>
                   <button
-                    onClick={() => copyToClipboard(justAdded.credentials.email, 'email')}
+                    onClick={() => copyToClipboard(justAdded.student?.email, 'email')}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: copied === 'email' ? 'var(--success)' : 'var(--text-lo)', padding: 6, display: 'flex' }}
                   >
                     {copied === 'email' ? <Check size={14} /> : <Copy size={14} />}
@@ -208,10 +208,10 @@ export function CoachDashboard() {
                 }}>
                   <div>
                     <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Password</div>
-                    <div style={{ fontSize: 13, color: 'var(--text-hi)', fontFamily: 'monospace' }}>{justAdded.credentials.password}</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-hi)', fontFamily: 'monospace' }}>{justAdded.tempPassword}</div>
                   </div>
                   <button
-                    onClick={() => copyToClipboard(justAdded.credentials.password, 'pw')}
+                    onClick={() => copyToClipboard(justAdded.tempPassword, 'pw')}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: copied === 'pw' ? 'var(--success)' : 'var(--text-lo)', padding: 6, display: 'flex' }}
                   >
                     {copied === 'pw' ? <Check size={14} /> : <Copy size={14} />}
@@ -222,7 +222,7 @@ export function CoachDashboard() {
                   <button
                     className="btn btn-gold"
                     onClick={() => {
-                      const text = `Your Ace The DAT portal is ready!\n\nSign in at: acethedat-portal.netlify.app\nEmail: ${justAdded.credentials.email}\nPassword: ${justAdded.credentials.password}`;
+                      const text = `Your Ace The DAT portal is ready!\n\nSign in at: acethedat-portal.netlify.app\nEmail: ${justAdded.student?.email}\nPassword: ${justAdded.tempPassword}`;
                       copyToClipboard(text, 'all');
                     }}
                     style={{ flex: 1, justifyContent: 'center', fontSize: 12.5 }}
