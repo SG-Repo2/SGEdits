@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { usePortal } from '../../app/providers/PortalProvider';
-import { demoStudents, ERROR_CATEGORIES, SECTIONS } from '../../data/seedData';
+import { ERROR_CATEGORIES, SECTIONS } from '../../data/seedData';
 
 const GLOBAL_INSIGHTS = [
   { id: 'i1', pattern: 'QR Decision Latency', instances: 7, fix: '90-sec hard cap + guess protocol eliminates pacing collapse in 5/7 cases', category: '3' },
@@ -41,8 +41,8 @@ function ErrorCatBar({ errors }) {
 }
 
 export function CoachDiagnostic() {
-  const { mqlErrors, addMqlError } = usePortal();
-  const [activeStudent, setActiveStudent] = useState(demoStudents[0]?.id || 'haniyeh');
+  const { mqlErrors, addMqlError, students = [] } = usePortal();
+  const [activeStudent, setActiveStudent] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ section: 'Bio', category: '', reasoning: '', pattern: '', intervention: '' });
   const [flash, setFlash] = useState(false);
@@ -50,7 +50,7 @@ export function CoachDiagnostic() {
   const [insights, setInsights] = useState(GLOBAL_INSIGHTS);
   const [newInsight, setNewInsight] = useState({ pattern: '', fix: '', category: '', instances: 1 });
 
-  const student = demoStudents.find(s => s.id === activeStudent) || demoStudents[0];
+  const student = students.find(s => s.id === activeStudent) || students[0];
 
   const handleSubmitError = () => {
     if (!form.category || !form.reasoning) return;
@@ -69,7 +69,7 @@ export function CoachDiagnostic() {
   };
 
   const totalErrors = mqlErrors.length;
-  const totalSessions = demoStudents.reduce((a, s) => a + (s.sessionCount || 0), 0);
+  const totalSessions = 0;
 
   return (
     <div className="animate-in">
@@ -80,7 +80,7 @@ export function CoachDiagnostic() {
 
       {/* Student Selector */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        {demoStudents.map(s => (
+        {students.map(s => (
           <button key={s.id} className={`btn ${activeStudent === s.id ? 'btn-gold' : 'btn-ghost'}`}
             onClick={() => setActiveStudent(s.id)}>
             {s.name}
@@ -107,7 +107,7 @@ export function CoachDiagnostic() {
         </div>
         <div className="stat-card">
           <div className="stat-card-label">Students</div>
-          <div className="stat-card-value" style={{ color: 'var(--success)' }}>{demoStudents.length}</div>
+          <div className="stat-card-value" style={{ color: 'var(--success)' }}>{students.length}</div>
           <div className="stat-card-sub">enrolled</div>
         </div>
       </div>
