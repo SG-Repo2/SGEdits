@@ -141,7 +141,7 @@ function EditBlockModal({ block, onSave, onCancel }) {
 }
 
 export default function CoachPlanningHub() {
-  const { students, saveWeeklyPlan, weeklyPlans: allWeeklyPlans } = usePortal() || {};
+  const { students, saveWeeklyPlan, weeklyPlans: allWeeklyPlans, weeklyPlanHistory } = usePortal() || {};
 
   const myStudents = useMemo(() => {
     if (!students) return [];
@@ -293,10 +293,9 @@ export default function CoachPlanningHub() {
   }, [plan]);
 
   const historicalPlans = useMemo(() => {
-    if (!selectedStudentId || !allWeeklyPlans) return [];
-    const p = allWeeklyPlans[selectedStudentId];
-    return p ? [p] : [];
-  }, [selectedStudentId, allWeeklyPlans]);
+    if (!selectedStudentId || !weeklyPlanHistory) return [];
+    return weeklyPlanHistory[selectedStudentId] || [];
+  }, [selectedStudentId, weeklyPlanHistory]);
 
   return (
     <div className="cph-page">
