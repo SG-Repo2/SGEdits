@@ -34,7 +34,7 @@ export function PortalLayout() {
           </div>
           {nav.map(item => {
             const Icon = item.icon;
-            const active = location.pathname === item.to;
+            const active = location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
             return (
               <div
                 key={item.to}

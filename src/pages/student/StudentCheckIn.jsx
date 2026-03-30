@@ -22,9 +22,8 @@ const MOOD_OPTIONS = [
 ];
 
 export default function StudentCheckIn({ studentId }) {
-  const { students, addCheckIn, currentUser } = usePortal();
-  const id = studentId || currentUser?.id;
-  const student = students.find(s => s.id === id);
+  const { students, addCheckIn, currentStudent } = usePortal();
+  const student = studentId ? students.find((s) => s.id === studentId) : currentStudent;
 
   const [step, setStep] = useState(0); // 0=mood, 1=scores, 2=confidence, 3=notes, 4=done
   const [mood, setMood] = useState('');

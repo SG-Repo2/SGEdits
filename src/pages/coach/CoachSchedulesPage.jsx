@@ -55,7 +55,7 @@ export function CoachSchedulesPage() {
       weakAreas: generatorState.weakAreas,
       published: plan?.published || false,
     });
-    saveWeeklyPlan(nextPlan);
+    saveWeeklyPlan(selectedStudent.id, nextPlan);
   };
 
   const updatePlanDayItem = (dayKey, itemId, patch) => {

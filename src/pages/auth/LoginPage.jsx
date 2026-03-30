@@ -37,7 +37,7 @@ export function LoginPage() {
             Ace The <em style={{ color: 'var(--gold)', fontStyle: 'italic' }}>DAT</em>
           </div>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--text-lo)' }}>
-            Student Portal
+            Coaching Portal
           </div>
         </div>
 

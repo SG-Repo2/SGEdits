@@ -2,31 +2,37 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { PortalProvider, usePortal } from './app/providers/PortalProvider';
 import { PortalLayout } from './layouts/PortalLayout';
 import { LoginPage } from './pages/auth/LoginPage';
-import { StudentDashboard } from './pages/student/StudentDashboard';
-import { StudentWeeklyPlan } from './pages/student/StudentWeeklyPlan';
-import { StudentSections } from './pages/student/StudentSections';
-import { StudentMQL } from './pages/student/StudentMQL';
-import { StudentProgress } from './pages/student/StudentProgress';
-import { StudentCheckIn } from './pages/student/StudentCheckIn';
-import { StudentMissedQuestions } from './pages/student/StudentMissedQuestions';
 import { CoachDashboard } from './pages/coach/CoachDashboard';
-import { CoachStudents } from './pages/coach/CoachStudents';
-import { CoachDiagnostic } from './pages/coach/CoachDiagnostic';
-import { CoachSessionFlow } from './pages/coach/CoachSessionFlow';
-import { CoachScheduleBuilder } from './pages/coach/CoachScheduleBuilder';
+import { CoachPaymentsPage } from './pages/coach/CoachPaymentsPage';
 import { CoachPlanningHub } from './pages/coach/CoachPlanningHub';
+import { CoachStudentDetailPage } from './pages/coach/CoachStudentDetailPage';
+import { CoachStudents } from './pages/coach/CoachStudents';
+import { StudentDashboard } from './pages/student/StudentDashboard';
+import { StudentMQL } from './pages/student/StudentMQL';
+import { StudentPaymentsPage } from './pages/student/StudentPaymentsPage';
+import { StudentSections } from './pages/student/StudentSections';
+import { StudentWeeklyPlan } from './pages/student/StudentWeeklyPlan';
 
 function RequireAuth({ children }) {
   const { session, loading } = usePortal();
+
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#0a1f0f' }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        background: '#0a1f0f',
+      }}
+      >
         <div style={{ textAlign: 'center', color: '#c9a84c' }}>
           <div style={{ fontSize: '1.2rem', letterSpacing: '0.1em' }}>Loading...</div>
         </div>
       </div>
     );
   }
+
   if (!session) return <Navigate replace to="/login" />;
   return children;
 }
@@ -56,23 +62,25 @@ export default function App() {
           <Route path="/" element={<RequireAuth><PortalLayout /></RequireAuth>}>
             <Route index element={<RoleRedirect />} />
 
-            {/* Student routes */}
             <Route path="student/dashboard" element={<RequireRole role="student"><StudentDashboard /></RequireRole>} />
             <Route path="student/weekly-plan" element={<RequireRole role="student"><StudentWeeklyPlan /></RequireRole>} />
-            <Route path="student/sections" element={<RequireRole role="student"><StudentSections /></RequireRole>} />
+            <Route path="student/practice-tests" element={<RequireRole role="student"><StudentSections /></RequireRole>} />
             <Route path="student/mql" element={<RequireRole role="student"><StudentMQL /></RequireRole>} />
-            <Route path="student/check-in" element={<RequireRole role="student"><StudentCheckIn /></RequireRole>} />
-            <Route path="student/missed-questions" element={<RequireRole role="student"><StudentMissedQuestions /></RequireRole>} />
-            <Route path="student/progress" element={<RequireRole role="student"><StudentProgress /></RequireRole>} />
-            <Route path="student/self-assessment" element={<RequireRole role="student"><div style={{padding:40}}>Coming soon</div></RequireRole>} />
+            <Route path="student/payments" element={<RequireRole role="student"><StudentPaymentsPage /></RequireRole>} />
+            <Route path="student/sections" element={<Navigate replace to="/student/practice-tests" />} />
+            <Route path="student/check-in" element={<Navigate replace to="/student/practice-tests" />} />
+            <Route path="student/missed-questions" element={<Navigate replace to="/student/mql" />} />
+            <Route path="student/progress" element={<Navigate replace to="/student/dashboard" />} />
+            <Route path="student/self-assessment" element={<Navigate replace to="/student/dashboard" />} />
 
-            {/* Coach routes */}
             <Route path="coach/dashboard" element={<RequireRole role="coach"><CoachDashboard /></RequireRole>} />
             <Route path="coach/students" element={<RequireRole role="coach"><CoachStudents /></RequireRole>} />
-            <Route path="coach/diagnostic" element={<RequireRole role="coach"><CoachDiagnostic /></RequireRole>} />
-            <Route path="coach/schedule-builder" element={<RequireRole role="coach"><CoachScheduleBuilder /></RequireRole>} />
-            <Route path="coach/session-flow" element={<RequireRole role="coach"><CoachSessionFlow /></RequireRole>} />
+            <Route path="coach/students/:studentId" element={<RequireRole role="coach"><CoachStudentDetailPage /></RequireRole>} />
             <Route path="coach/planning-hub" element={<RequireRole role="coach"><CoachPlanningHub /></RequireRole>} />
+            <Route path="coach/payments" element={<RequireRole role="coach"><CoachPaymentsPage /></RequireRole>} />
+            <Route path="coach/schedule-builder" element={<Navigate replace to="/coach/planning-hub" />} />
+            <Route path="coach/diagnostic" element={<Navigate replace to="/coach/students" />} />
+            <Route path="coach/session-flow" element={<Navigate replace to="/coach/students" />} />
           </Route>
           <Route path="*" element={<Navigate replace to="/" />} />
         </Routes>

@@ -1,221 +1,313 @@
+import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { usePortal } from '../../app/providers/PortalProvider';
-import { Badge } from '../../components/common/Badge';
-import { Button } from '../../components/common/Button';
-import { EmptyState } from '../../components/common/EmptyState';
-import { MetricCard } from '../../components/common/MetricCard';
-import { PageIntro } from '../../components/common/PageIntro';
-import { SectionCard } from '../../components/common/SectionCard';
-import { getAssessmentStatusLabel, summarizeAssessment } from '../../features/assessments/utils';
-import { formatDate } from '../../utils/date';
-import { formatCurrency, formatHours, formatPercent } from '../../utils/formatters';
-import { getCurrentWeeklyPlan, getStudentPayments, getStudentSessions } from '../../utils/selectors';
-import { summarizeWeeklyPlan } from '../../features/schedules/utils';
+import { PracticeTestTrendChart } from '../../components/charts/PracticeTestTrendChart';
+import { DAT_SECTIONS, MQL_ERROR_TYPES, WEEKDAY_META } from '../../data/manualWorkflow';
+import { formatCurrency } from '../../utils/formatters';
+
+function buildMqlSummary(entries) {
+  return DAT_SECTIONS.map((section) => {
+    const sectionEntries = entries.filter((entry) => entry.section === section);
+    const errorCounts = MQL_ERROR_TYPES.reduce((collection, errorType) => {
+      collection[errorType] = sectionEntries.filter((entry) => entry.errorType === errorType).length;
+      return collection;
+    }, {});
+    return {
+      section,
+      total: sectionEntries.length,
+      errorCounts,
+    };
+  }).filter((summary) => summary.total > 0);
+}
 
 export function CoachStudentDetailPage() {
   const { studentId } = useParams();
-  const { students, sessions, payments, weeklyPlans, selfAssessments, markAssessmentReviewed } = usePortal();
-  const student = students.find((item) => item.id === studentId);
+  const {
+    students,
+    getWeeklyPlan,
+    getStudentPracticeTests,
+    getStudentMqlEntries,
+    getStudentPayments,
+  } = usePortal();
+
+  const student = students.find((entry) => entry.id === studentId) || null;
+  const weeklyPlan = student ? getWeeklyPlan(student.id) : null;
+  const practiceTests = student ? getStudentPracticeTests(student.id) : [];
+  const mqlEntries = student ? getStudentMqlEntries(student.id) : [];
+  const payments = student ? getStudentPayments(student.id) : [];
+
+  const mqlSummary = useMemo(() => buildMqlSummary(mqlEntries), [mqlEntries]);
+  const totalPlanTasks = weeklyPlan?.days?.reduce((sum, day) => sum + day.tasks.length, 0) || 0;
 
   if (!student) {
-    return <EmptyState description="The requested student record is not present in the current seed data." title="Student not found" />;
+    return (
+      <div style={{ padding: 28, color: 'var(--text-muted)' }}>
+        Student not found.
+      </div>
+    );
   }
 
-  const studentSessions = getStudentSessions(sessions, student.id);
-  const studentPayments = getStudentPayments(payments, student.id);
-  const currentPlan = getCurrentWeeklyPlan(weeklyPlans, student.id);
-  const planSummary = summarizeWeeklyPlan(currentPlan);
-  const assessmentSummary = summarizeAssessment(student, selfAssessments[student.id]);
-
   return (
-    <div className="page-stack">
-      <PageIntro
-        actions={
-          <Link className="button button--outline button--accent button--md" to={`/coach/schedules?student=${student.id}`}>
-            Open weekly plan
-          </Link>
-        }
-        description={student.notes}
-        eyebrow="Student Detail"
-        title={student.name}
-      />
+    <div className="animate-in">
+      <div style={{
+        background: 'var(--gold-bg)',
+        border: '1px solid var(--gold-border)',
+        borderRadius: 'var(--r-xl)',
+        padding: '30px 34px',
+        marginBottom: 24,
+      }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 18, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--gold-dim)', marginBottom: 12 }}>
+              Student Detail
+            </div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 700, color: 'var(--text-hi)', marginBottom: 8 }}>
+              {student.name}
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <span className="tag tag-muted">{student.id}</span>
+              <span className="tag tag-gold">{student.program || 'DAT Coaching'}</span>
+              <span className={`tag ${student.status === 'Active' ? 'tag-success' : 'tag-muted'}`}>{student.status}</span>
+            </div>
+          </div>
 
-      <div className="metric-grid metric-grid--three">
-        <MetricCard helper={student.planType} label="Hours used" value={formatHours(student.hoursUsed)} />
-        <MetricCard helper="Collected so far" label="Amount paid" value={formatCurrency(student.amountPaid)} />
-        <MetricCard helper={student.nextPaymentAmountLabel || 'No next payment scheduled'} label="Amount owed" tone={student.amountOwed > 0 ? 'danger' : 'default'} value={formatCurrency(student.amountOwed)} />
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <Link className="btn btn-subtle" to={`/coach/planning-hub?student=${student.id}`}>
+              Open Planning Hub
+            </Link>
+            <Link className="btn btn-gold" to="/coach/payments">
+              Open Payments
+            </Link>
+          </div>
+        </div>
       </div>
 
-      <div className="dashboard-grid">
-        <SectionCard title="Profile">
-          <dl className="detail-list">
-            <div>
-              <dt>Status</dt>
-              <dd>
-                <Badge tone={student.amountOwed > 0 ? 'warning' : 'success'}>{student.status}</Badge>
-              </dd>
-            </div>
-            <div>
-              <dt>Coach team</dt>
-              <dd>
-                {student.primaryCoach}
-                {student.supportCoach ? ` + ${student.supportCoach}` : ''}
-              </dd>
-            </div>
-            <div>
-              <dt>Plan</dt>
-              <dd>{student.planType}</dd>
-            </div>
-            <div>
-              <dt>Focus</dt>
-              <dd>{student.focusArea}</dd>
-            </div>
-            <div>
-              <dt>Target exam</dt>
-              <dd>{student.targetExamDate ? formatDate(student.targetExamDate) : 'TBD'}</dd>
-            </div>
-            <div>
-              <dt>Predicted score</dt>
-              <dd>
-                {student.predictedScore} / goal {student.goalScore}
-              </dd>
-            </div>
-          </dl>
-        </SectionCard>
+      <div className="stat-grid stat-grid-4" style={{ marginBottom: 18 }}>
+        <div className="stat-card">
+          <div className="stat-card-label">Weekly Plan</div>
+          <div className="stat-card-value" style={{ color: 'var(--gold)' }}>{weeklyPlan?.status || 'none'}</div>
+          <div className="stat-card-sub">{totalPlanTasks} tasks in current view</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-card-label">Practice Tests</div>
+          <div className="stat-card-value" style={{ color: 'var(--text-hi)' }}>{practiceTests.length}</div>
+          <div className="stat-card-sub">manual test records</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-card-label">MQL Entries</div>
+          <div className="stat-card-value" style={{ color: 'var(--success)' }}>{mqlEntries.length}</div>
+          <div className="stat-card-sub">manual missed question log entries</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-card-label">Remaining Balance</div>
+          <div className="stat-card-value" style={{ color: student.remainingBalance > 0 ? 'var(--danger)' : 'var(--success)' }}>
+            {formatCurrency(student.remainingBalance || 0)}
+          </div>
+          <div className="stat-card-sub">next payment {student.nextPaymentDate || 'not set'}</div>
+        </div>
+      </div>
 
-        <SectionCard title="Current weekly plan">
-          {currentPlan ? (
-            <div className="stack-list">
-              <div className="list-row">
-                <div>
-                  <p className="list-row__title">{currentPlan.published ? 'Published to student' : 'Draft plan'}</p>
-                  <p className="list-row__meta">{currentPlan.coachNote}</p>
-                </div>
-                <Badge tone={currentPlan.published ? 'success' : 'warning'}>{currentPlan.published ? 'Live' : 'Draft'}</Badge>
-              </div>
-              <div className="detail-grid">
-                <div>
-                  <p className="label">Completion</p>
-                  <strong>{formatPercent(planSummary.completionRate)}</strong>
-                </div>
-                <div>
-                  <p className="label">Planned hours</p>
-                  <strong>{formatHours(planSummary.totalHours)}</strong>
-                </div>
-              </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(320px, 1fr)', gap: 18, alignItems: 'start', marginBottom: 18 }}>
+        <div className="panel">
+          <div className="panel-header">
+            <span className="panel-title">Current Weekly Plan</span>
+          </div>
+          {weeklyPlan ? (
+            <div style={{ display: 'grid', gap: 12 }}>
+              {WEEKDAY_META.map((dayMeta) => {
+                const day = weeklyPlan.days.find((entry) => entry.id === dayMeta.key);
+                const taskCount = day?.tasks?.length || 0;
+                return (
+                  <div key={dayMeta.key} style={{
+                    padding: '12px 14px',
+                    borderRadius: 12,
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-panel-hover)',
+                  }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: dayMeta.color }}>{dayMeta.label}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-lo)' }}>{taskCount} tasks</div>
+                    </div>
+                    {taskCount > 0 ? (
+                      <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
+                        {day.tasks.slice(0, 3).map((task) => (
+                          <div key={task.id} style={{ fontSize: 12, color: 'var(--text-mid)' }}>
+                            {task.text}
+                          </div>
+                        ))}
+                        {taskCount > 3 && (
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                            +{taskCount - 3} more
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+                        No tasks set.
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           ) : (
-            <EmptyState
-              compact
-              action={<Link className="text-link" to={`/coach/schedules?student=${student.id}`}>Create this week&apos;s plan</Link>}
-              description="No weekly plan exists for the current week yet."
-              title="Schedule not created"
-            />
+            <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+              No weekly plan has been created for this student yet.
+            </div>
           )}
-        </SectionCard>
+        </div>
+
+        <div className="panel">
+          <div className="panel-header">
+            <span className="panel-title">Payment Snapshot</span>
+          </div>
+          <div style={{ display: 'grid', gap: 10 }}>
+            <div style={{ padding: '12px 14px', borderRadius: 12, background: 'var(--bg-panel-hover)', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-lo)' }}>Amount Paid</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-hi)', marginTop: 6 }}>
+                {formatCurrency(student.amountPaid || 0)}
+              </div>
+            </div>
+            <div style={{ padding: '12px 14px', borderRadius: 12, background: 'var(--bg-panel-hover)', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-lo)' }}>Remaining Balance</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: student.remainingBalance > 0 ? 'var(--danger)' : 'var(--success)', marginTop: 6 }}>
+                {formatCurrency(student.remainingBalance || 0)}
+              </div>
+            </div>
+            <div style={{ padding: '12px 14px', borderRadius: 12, background: 'var(--bg-panel-hover)', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-lo)' }}>Next Payment Date</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-hi)', marginTop: 6 }}>
+                {student.nextPaymentDate || 'Not scheduled'}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <SectionCard
-        actions={
-          assessmentSummary?.status === 'submitted' ? (
-            <Button onClick={() => markAssessmentReviewed(student.id)} tone="neutral" variant="outline">
-              Mark reviewed
-            </Button>
-          ) : null
-        }
-        title="Student self-assessment"
-      >
-        {assessmentSummary ? (
-          <div className="stack-list">
-            <div className="list-row">
-              <div>
-                <p className="list-row__title">Prefill issue areas</p>
-                <p className="list-row__meta">
-                  {assessmentSummary.weakAreaLabels.length
-                    ? assessmentSummary.weakAreaLabels.join(', ')
-                    : 'No section issues identified'}
-                </p>
-              </div>
-              <div className="tag-row">
-                <Badge tone={assessmentSummary.status === 'submitted' ? 'accent' : assessmentSummary.status === 'reviewed' ? 'success' : 'warning'}>
-                  {getAssessmentStatusLabel(assessmentSummary.status)}
-                </Badge>
-                <Badge tone="neutral">
-                  Updated {formatDate(assessmentSummary.updatedAt, { month: 'short', day: 'numeric', year: 'numeric' })}
-                </Badge>
-              </div>
-            </div>
+      <div className="panel" style={{ marginBottom: 18 }}>
+        <div className="panel-header">
+          <span className="panel-title">Practice Test Trends</span>
+        </div>
+        <PracticeTestTrendChart tests={practiceTests} />
+        {practiceTests.length > 0 && (
+          <div style={{ marginTop: 16 }} className="table-shell">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>PT</th>
+                  <th>Date</th>
+                  {DAT_SECTIONS.map((section) => <th key={section}>{section}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {practiceTests.map((test) => (
+                  <tr key={test.id}>
+                    <td>{test.testNumber}</td>
+                    <td>{test.takenOn}</td>
+                    {DAT_SECTIONS.map((section) => <td key={section}>{test.sections[section] ?? '-'}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
-            <div className="tag-row">
-              {assessmentSummary.concernLabels.map((label) => (
-                <Badge key={label} tone="warning">
-                  {label}
-                </Badge>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 18 }}>
+        <div className="panel">
+          <div className="panel-header">
+            <span className="panel-title">MQL Patterns</span>
+          </div>
+          {mqlSummary.length > 0 ? (
+            <div style={{ display: 'grid', gap: 10 }}>
+              {mqlSummary.map((summary) => (
+                <div key={summary.section} style={{ padding: '12px 14px', borderRadius: 12, background: 'var(--bg-panel-hover)', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-hi)', marginBottom: 8 }}>
+                    {summary.section} ({summary.total})
+                  </div>
+                  <div style={{ display: 'grid', gap: 6, fontSize: 12, color: 'var(--text-lo)' }}>
+                    {MQL_ERROR_TYPES.map((errorType) => (
+                      <div key={errorType} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                        <span>{errorType}</span>
+                        <strong style={{ color: 'var(--text-hi)' }}>{summary.errorCounts[errorType]}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
-
-            <div className="stack-list stack-list--tight">
-              {assessmentSummary.ratings
-                .sort((left, right) => left.score - right.score)
-                .map((rating) => (
-                  <div className="list-row" key={rating.section}>
-                    <div>
-                      <p className="list-row__title">{rating.sectionLabel}</p>
-                      <p className="list-row__meta">{rating.scoreLabel}</p>
-                    </div>
-                    <Badge tone={rating.score <= 2 ? 'danger' : rating.score === 3 ? 'warning' : 'success'}>
-                      {rating.score}/5
-                    </Badge>
-                  </div>
-                ))}
+          ) : (
+            <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+              No MQL patterns yet.
             </div>
+          )}
+        </div>
 
-            {assessmentSummary.note ? (
-              <div className="inline-note">
-                <p className="section-label">Student note</p>
-                <p>{assessmentSummary.note}</p>
-              </div>
-            ) : null}
+        <div className="panel">
+          <div className="panel-header">
+            <span className="panel-title">Recent MQL Entries</span>
+          </div>
+          {mqlEntries.length > 0 ? (
+            <div style={{ display: 'grid', gap: 10 }}>
+              {mqlEntries.slice(0, 8).map((entry) => (
+                <div key={entry.id} style={{ padding: '12px 14px', borderRadius: 12, background: 'var(--bg-panel-hover)', border: '1px solid var(--border)' }}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+                    <span className="tag tag-muted">{entry.section}</span>
+                    <span className="tag tag-gold">{entry.errorType}</span>
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text-hi)', marginBottom: 6 }}>
+                    {entry.questionReference || 'Question reference not set'}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-lo)' }}>
+                    Action: {entry.actionItem || 'Not set'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+              No MQL entries yet.
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="panel" style={{ marginTop: 18 }}>
+        <div className="panel-header">
+          <span className="panel-title">Student Payment Entries</span>
+        </div>
+        {payments.length > 0 ? (
+          <div className="table-shell">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Kind</th>
+                  <th>Method</th>
+                  <th>Amount</th>
+                  <th>Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payments.map((payment) => (
+                  <tr key={payment.id}>
+                    <td>{payment.date}</td>
+                    <td>{payment.kind}</td>
+                    <td>{payment.method}</td>
+                    <td>{formatCurrency(payment.amount)}</td>
+                    <td>{payment.note || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : (
-          <EmptyState compact description="This student has not submitted a self-assessment yet." title="No assessment on file" />
+          <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+            No payment entries logged yet.
+          </div>
         )}
-      </SectionCard>
-
-      <div className="dashboard-grid">
-        <SectionCard title={`Recent sessions (${studentSessions.length})`}>
-          <div className="stack-list">
-            {studentSessions.slice(0, 6).map((session) => (
-              <div className="list-row" key={session.id}>
-                <div>
-                  <p className="list-row__title">{session.topicSummary}</p>
-                  <p className="list-row__meta">
-                    {formatDate(session.date)} · {session.coach}
-                  </p>
-                </div>
-                <div className="list-row__meta">
-                  {formatHours(session.hours)} · {session.status}
-                </div>
-              </div>
-            ))}
-          </div>
-        </SectionCard>
-
-        <SectionCard title={`Payment history (${studentPayments.length})`}>
-          <div className="stack-list">
-            {studentPayments.slice(0, 6).map((payment) => (
-              <div className="list-row" key={payment.id}>
-                <div>
-                  <p className="list-row__title">{payment.kind}</p>
-                  <p className="list-row__meta">
-                    {payment.method} · {formatDate(payment.date)}
-                  </p>
-                </div>
-                <strong>{formatCurrency(payment.amount)}</strong>
-              </div>
-            ))}
-          </div>
-        </SectionCard>
       </div>
     </div>
   );

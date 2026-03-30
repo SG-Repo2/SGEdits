@@ -1,356 +1,214 @@
-import { useState } from 'react';
-import { usePortal } from '../../app/providers/PortalProvider';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, TrendingUp, ArrowRight, UserPlus, X, Copy, Check } from 'lucide-react';
+import { CalendarDays, CreditCard, Users } from 'lucide-react';
+import { usePortal } from '../../app/providers/PortalProvider';
+import { formatCurrency } from '../../utils/formatters';
 
 export function CoachDashboard() {
-  const { session, students, addStudent } = usePortal();
+  const { session, students, weeklyPlans, practiceTests } = usePortal();
   const navigate = useNavigate();
-  const [showAdd, setShowAdd] = useState(false);
-  const [newStudent, setNewStudent] = useState({ name: '', email: '', program: 'Package', targetAA: 400, testDate: '' });
-  const [justAdded, setJustAdded] = useState(null);
-  const [copied, setCopied] = useState('');
 
-  const activeStudents = students;
-  const totalStudents = students.length;
-  const datStudents = students.filter(s => s.predicted > 0);
-  const avgPredicted = datStudents.length > 0 ? Math.round(datStudents.reduce((a, s) => a + s.predicted, 0) / datStudents.length) : 0;
-  const avgTarget = datStudents.length > 0 ? Math.round(datStudents.reduce((a, s) => a + (s.targetAA || 0), 0) / datStudents.length) : 0;
+  const activeStudents = useMemo(
+    () => students.filter((student) => student.status !== 'Archived'),
+    [students],
+  );
 
-  const handleAdd = async (e) => {
-    e.preventDefault();
-    if (!newStudent.name.trim() || !newStudent.email.trim()) return;
-    const result = await addStudent(newStudent);
-    setJustAdded(result);
-    setNewStudent({ name: '', email: '', program: 'Package', targetAA: 400, testDate: '' });
-  };
+  const currentWeekPlans = useMemo(() => (
+    Object.values(weeklyPlans || {}).filter((plan) => plan?.status === 'published')
+  ), [weeklyPlans]);
 
-  const copyToClipboard = (text, label) => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(label);
-      setTimeout(() => setCopied(''), 2000);
-    });
-  };
+  const outstandingBalance = activeStudents.reduce(
+    (sum, student) => sum + (Number(student.remainingBalance) || 0),
+    0,
+  );
+
+  const nextPayments = [...activeStudents]
+    .filter((student) => student.nextPaymentDate)
+    .sort((left, right) => new Date(left.nextPaymentDate) - new Date(right.nextPaymentDate))
+    .slice(0, 5);
 
   return (
     <div className="animate-in">
-      {/* Coach Header */}
-      <div style={{ background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 'var(--r-xl)', padding: '32px 36px', marginBottom: 28 }}>
+      <div style={{
+        background: 'var(--gold-bg)',
+        border: '1px solid var(--gold-border)',
+        borderRadius: 'var(--r-xl)',
+        padding: '32px 36px',
+        marginBottom: 28,
+      }}
+      >
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '2.5px', textTransform: 'uppercase', color: 'var(--gold-dim)', marginBottom: 16 }}>
-          Ace The DAT · Coaching OS
+          Ace The DAT · Manual Coaching System
         </div>
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 700, color: 'var(--text-hi)', letterSpacing: '-0.5px', marginBottom: 6 }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 700, color: 'var(--text-hi)', marginBottom: 6 }}>
           Welcome back, {session?.name || 'Coach'}
         </div>
-        <div style={{ fontSize: 14, fontWeight: 300, color: 'var(--text-lo)', lineHeight: 1.6 }}>
-          {activeStudents.length} active student{activeStudents.length !== 1 ? 's' : ''} · {totalStudents} total enrolled
+        <div style={{ fontSize: 14, color: 'var(--text-lo)', lineHeight: 1.6 }}>
+          Coach visibility now runs through real student records, published weekly plans, practice test logs, MQL entries, and manual payments.
         </div>
       </div>
 
-      {/* Stats */}
       <div className="stat-grid stat-grid-4">
         <div className="stat-card">
-          <div className="stat-card-label">Active Students</div>
+          <div className="stat-card-label">Student Roster</div>
           <div className="stat-card-value" style={{ color: 'var(--gold)' }}>{activeStudents.length}</div>
-          <div className="stat-card-sub">currently enrolled</div>
+          <div className="stat-card-sub">active student records</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card-label">Avg Predicted</div>
-          <div className="stat-card-value" style={{ color: 'var(--text-hi)' }}>{avgPredicted}</div>
-          <div className="stat-card-sub">across all students</div>
+          <div className="stat-card-label">Published Plans</div>
+          <div className="stat-card-value" style={{ color: 'var(--text-hi)' }}>{currentWeekPlans.length}</div>
+          <div className="stat-card-sub">visible to students</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card-label">Avg Target</div>
-          <div className="stat-card-value" style={{ color: 'var(--success)' }}>{avgTarget}</div>
-          <div className="stat-card-sub">goal score</div>
+          <div className="stat-card-label">Practice Tests Logged</div>
+          <div className="stat-card-value" style={{ color: 'var(--success)' }}>{practiceTests.length}</div>
+          <div className="stat-card-sub">manual entries stored</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card-label">Gap to Close</div>
-          <div className="stat-card-value" style={{ color: avgTarget - avgPredicted > 30 ? 'var(--danger)' : 'var(--success)' }}>
-            {avgTarget - avgPredicted}
+          <div className="stat-card-label">Outstanding Balance</div>
+          <div className="stat-card-value" style={{ color: outstandingBalance > 0 ? 'var(--danger)' : 'var(--success)' }}>
+            {formatCurrency(outstandingBalance)}
           </div>
-          <div className="stat-card-sub">avg points</div>
+          <div className="stat-card-sub">manual payment tracking</div>
         </div>
       </div>
 
-      {/* Student Roster */}
-      <div className="panel">
-        <div className="panel-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Users size={16} style={{ color: 'var(--gold)' }} />
-            <span className="panel-title">Student Roster</span>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-gold" onClick={() => { setShowAdd(true); setJustAdded(null); }} style={{ fontSize: 12, padding: '6px 14px', gap: 6 }}>
-              <UserPlus size={13} /> Add Student
-            </button>
-            <button className="btn btn-ghost" onClick={() => navigate('/coach/students')}>
-              View All <ArrowRight size={12} />
-            </button>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {students.map(student => {
-            const gap = (student.targetAA || 0) - (student.predicted || 0);
-            return (
-              <div key={student.id} style={{
-                padding: '16px 18px', borderRadius: 12,
-                background: 'var(--bg-panel-hover)', border: '1px solid var(--border)',
-                display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 14, alignItems: 'center',
-                cursor: 'pointer', transition: 'border-color 0.15s'
-              }}
-              onClick={() => navigate('/coach/students')}>
-                <div style={{
-                  width: 40, height: 40, borderRadius: '50%',
-                  background: `${student.color}20`, border: `1.5px solid ${student.color}50`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 15, fontWeight: 700, color: student.color
-                }}>
-                  {student.initials}
-                </div>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-hi)', marginBottom: 3 }}>
-                    {student.name}
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    <span className="tag tag-gold">{student.program}</span>
-                    <span className="tag tag-muted">{student.phase}</span>
-                    <span className={`tag ${student.status === 'Active' ? 'tag-success' : 'tag-muted'}`}>
-                      {student.status}
-                    </span>
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--gold)', lineHeight: 1 }}>
-                    {student.predicted || '—'}
-                  </div>
-                  <div style={{ fontSize: 11, color: gap > 30 ? 'var(--danger)' : gap > 0 ? 'var(--success)' : 'var(--text-muted)', marginTop: 3 }}>
-                    {student.predicted ? (gap > 0 ? `${gap} pts to go` : 'On target') : 'No data yet'}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Add Student Modal */}
-      {showAdd && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-          backdropFilter: 'blur(4px)'
-        }} onClick={() => setShowAdd(false)}>
-          <div style={{
-            background: 'var(--bg-panel)', border: '1px solid var(--gold-border)',
-            borderRadius: 16, padding: 0, width: '100%', maxWidth: 480,
-            boxShadow: '0 20px 60px rgba(0,0,0,0.5)'
-          }} onClick={e => e.stopPropagation()}>
-
-            {/* Modal Header */}
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-hi)' }}>
-                  {justAdded ? 'Student Created' : 'Add New Student'}
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-lo)', marginTop: 2 }}>
-                  {justAdded ? 'Share these credentials with your student' : 'Set up a new student portal'}
-                </div>
-              </div>
-              <button onClick={() => setShowAdd(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}>
-                <X size={18} />
-              </button>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) minmax(320px, 1fr)', gap: 18, alignItems: 'start' }}>
+        <div className="panel">
+          <div className="panel-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Users size={16} style={{ color: 'var(--gold)' }} />
+              <span className="panel-title">Student Roster</span>
             </div>
+            <button className="btn btn-gold" onClick={() => navigate('/coach/students')} style={{ fontSize: 12, padding: '6px 14px' }}>
+              Open Students
+            </button>
+          </div>
 
-            {/* Success State — Show Credentials */}
-            {justAdded ? (
-              <div style={{ padding: '24px' }}>
-                <div style={{
-                  background: 'rgba(22,163,74,0.08)', border: '1px solid rgba(22,163,74,0.2)',
-                  borderRadius: 10, padding: '16px 18px', marginBottom: 20
-                }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--success)', marginBottom: 4 }}>
-                    \u2713 {justAdded.student.name}'s portal is ready
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {activeStudents.slice(0, 6).map((student) => {
+              const studentPlan = Object.values(weeklyPlans || {}).find((plan) => plan.studentId === student.id);
+              return (
+                <button
+                  key={student.id}
+                  type="button"
+                  onClick={() => navigate(`/coach/students/${student.id}`)}
+                  style={{
+                    padding: '16px 18px',
+                    borderRadius: 12,
+                    background: 'var(--bg-panel-hover)',
+                    border: '1px solid var(--border)',
+                    display: 'grid',
+                    gridTemplateColumns: 'auto 1fr auto',
+                    gap: 14,
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  <div style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: '50%',
+                    background: `${student.color}20`,
+                    border: `1.5px solid ${student.color}50`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 15,
+                    fontWeight: 700,
+                    color: student.color,
+                  }}
+                  >
+                    {student.initials}
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-lo)' }}>
-                    They can sign in at acethedat-portal.netlify.app
-                  </div>
-                </div>
-
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 10 }}>
-                  Login Credentials
-                </div>
-
-                {/* Email row */}
-                <div style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '10px 14px', background: 'var(--bg-surface)', border: '1px solid var(--border)',
-                  borderRadius: 8, marginBottom: 8
-                }}>
                   <div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Email</div>
-                    <div style={{ fontSize: 13, color: 'var(--text-hi)', fontFamily: 'monospace' }}>{justAdded.student?.email}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-hi)', marginBottom: 4 }}>
+                      {student.name}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <span className="tag tag-muted">{student.program || 'DAT Coaching'}</span>
+                      <span className={`tag ${studentPlan?.status === 'published' ? 'tag-success' : 'tag-gold'}`}>
+                        {studentPlan?.status === 'published' ? 'Plan live' : 'Needs plan review'}
+                      </span>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => copyToClipboard(justAdded.student?.email, 'email')}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: copied === 'email' ? 'var(--success)' : 'var(--text-lo)', padding: 6, display: 'flex' }}
-                  >
-                    {copied === 'email' ? <Check size={14} /> : <Copy size={14} />}
-                  </button>
-                </div>
-
-                {/* Password row */}
-                <div style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '10px 14px', background: 'var(--bg-surface)', border: '1px solid var(--border)',
-                  borderRadius: 8, marginBottom: 20
-                }}>
-                  <div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Password</div>
-                    <div style={{ fontSize: 13, color: 'var(--text-hi)', fontFamily: 'monospace' }}>{justAdded.tempPassword}</div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-lo)' }}>Balance</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: student.remainingBalance > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                      {formatCurrency(student.remainingBalance || 0)}
+                    </div>
                   </div>
-                  <button
-                    onClick={() => copyToClipboard(justAdded.tempPassword, 'pw')}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: copied === 'pw' ? 'var(--success)' : 'var(--text-lo)', padding: 6, display: 'flex' }}
-                  >
-                    {copied === 'pw' ? <Check size={14} /> : <Copy size={14} />}
-                  </button>
-                </div>
-
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <button
-                    className="btn btn-gold"
-                    onClick={() => {
-                      const text = `Your Ace The DAT portal is ready!\n\nSign in at: acethedat-portal.netlify.app\nEmail: ${justAdded.student?.email}\nPassword: ${justAdded.tempPassword}`;
-                      copyToClipboard(text, 'all');
-                    }}
-                    style={{ flex: 1, justifyContent: 'center', fontSize: 12.5 }}
-                  >
-                    {copied === 'all' ? <><Check size={13} /> Copied!</> : <><Copy size={13} /> Copy All</>}
-                  </button>
-                  <button className="btn btn-ghost" onClick={() => { setJustAdded(null); }} style={{ fontSize: 12.5 }}>
-                    Add Another
-                  </button>
-                  <button className="btn btn-ghost" onClick={() => setShowAdd(false)} style={{ fontSize: 12.5 }}>
-                    Done
-                  </button>
-                </div>
+                </button>
+              );
+            })}
+            {activeStudents.length === 0 && (
+              <div style={{ padding: '24px 0', color: 'var(--text-muted)', textAlign: 'center' }}>
+                Create your first student from the Students page to start the manual workflow.
               </div>
-            ) : (
-              /* Form State */
-              <form onSubmit={handleAdd} style={{ padding: '24px' }}>
-                {/* Name */}
-                <div style={{ marginBottom: 14 }}>
-                  <label style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--text-lo)', marginBottom: 5 }}>
-                    Student Name *
-                  </label>
-                  <input
-                    className="form-input"
-                    placeholder="e.g. Sarah"
-                    value={newStudent.name}
-                    onChange={e => setNewStudent(s => ({ ...s, name: e.target.value }))}
-                    autoFocus
-                    style={{ width: '100%', boxSizing: 'border-box' }}
-                  />
-                </div>
-
-                {/* Email */}
-                <div style={{ marginBottom: 14 }}>
-                  <label style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--text-lo)', marginBottom: 5 }}>
-                    Student Email *
-                  </label>
-                  <input
-                    className="form-input"
-                    type="email"
-                    placeholder="sarah@student.acethedat.com"
-                    value={newStudent.email}
-                    onChange={e => setNewStudent(s => ({ ...s, email: e.target.value }))}
-                    style={{ width: '100%', boxSizing: 'border-box' }}
-                  />
-                </div>
-
-                {/* Program + Target row */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--text-lo)', marginBottom: 5 }}>
-                      Program
-                    </label>
-                    <select
-                      className="form-select"
-                      value={newStudent.program}
-                      onChange={e => setNewStudent(s => ({ ...s, program: e.target.value }))}
-                      style={{ width: '100%', boxSizing: 'border-box' }}
-                    >
-                      <option value="Package">Package</option>
-                      <option value="Hourly">Hourly</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--text-lo)', marginBottom: 5 }}>
-                      Target AA (200-600)
-                    </label>
-                    <input
-                      className="form-input"
-                      type="number"
-                      min="200"
-                      max="600"
-                      step="10"
-                      value={newStudent.targetAA}
-                      onChange={e => setNewStudent(s => ({ ...s, targetAA: parseInt(e.target.value) || 400 }))}
-                      style={{ width: '100%', boxSizing: 'border-box' }}
-                    />
-                  </div>
-                </div>
-
-                {/* Test Date */}
-                <div style={{ marginBottom: 20 }}>
-                  <label style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--text-lo)', marginBottom: 5 }}>
-                    DAT Test Date
-                  </label>
-                  <input
-                    className="form-input"
-                    type="date"
-                    value={newStudent.testDate}
-                    onChange={e => setNewStudent(s => ({ ...s, testDate: e.target.value }))}
-                    style={{ width: '100%', boxSizing: 'border-box' }}
-                  />
-                </div>
-
-                <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.6 }}>
-                  A password will be auto-generated as <span style={{ fontFamily: 'monospace', color: 'var(--text-lo)' }}>AceDAT-{newStudent.name || 'Name'}</span>. You'll see it after creating.
-                </div>
-
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <button
-                    type="submit"
-                    className="btn btn-gold"
-                    disabled={!newStudent.name.trim() || !newStudent.email.trim()}
-                    style={{ flex: 1, justifyContent: 'center', fontSize: 13, padding: '11px 0', gap: 8, opacity: (!newStudent.name.trim() || !newStudent.email.trim()) ? 0.4 : 1 }}
-                  >
-                    <UserPlus size={14} /> Create Student Portal
-                  </button>
-                  <button type="button" className="btn btn-ghost" onClick={() => setShowAdd(false)} style={{ fontSize: 12.5 }}>
-                    Cancel
-                  </button>
-                </div>
-              </form>
             )}
           </div>
         </div>
-      )}
 
-      {/* System Rule */}
-      <div style={{
-        padding: '16px 20px', borderRadius: 12,
-        background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', marginTop: 4
-      }}>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', color: 'var(--gold)', marginBottom: 6, textTransform: 'uppercase' }}>
-          System Rule
-        </div>
-        <div style={{ fontSize: 13, color: 'var(--text-mid)', lineHeight: 1.7, fontWeight: 300 }}>
-          Every session must produce at least one logged insight — not a student note, a pattern insight.
-          After 20 students, this database becomes your moat. No competitor can replicate it.
+        <div style={{ display: 'grid', gap: 18 }}>
+          <div className="panel">
+            <div className="panel-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <CalendarDays size={16} style={{ color: 'var(--gold)' }} />
+                <span className="panel-title">Calendar</span>
+              </div>
+            </div>
+            <div style={{
+              padding: '18px 16px',
+              borderRadius: 12,
+              background: 'var(--bg-panel-hover)',
+              border: '1px dashed var(--border)',
+              color: 'var(--text-lo)',
+              lineHeight: 1.7,
+              fontSize: 13,
+            }}
+            >
+              Placeholder slot for calendar integration. Weekly planning is already student-specific, so this panel can later surface live coaching sessions without changing the data model.
+            </div>
+          </div>
+
+          <div className="panel">
+            <div className="panel-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <CreditCard size={16} style={{ color: 'var(--gold)' }} />
+                <span className="panel-title">Upcoming Payments</span>
+              </div>
+              <button className="btn btn-subtle" onClick={() => navigate('/coach/payments')} style={{ fontSize: 12, padding: '6px 14px' }}>
+                Manage Payments
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {nextPayments.length > 0 ? nextPayments.map((student) => (
+                <div
+                  key={student.id}
+                  style={{
+                    padding: '12px 14px',
+                    borderRadius: 12,
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-panel-hover)',
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-hi)' }}>{student.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-lo)', marginTop: 4 }}>
+                    Next payment: {student.nextPaymentDate}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-lo)' }}>
+                    Remaining balance: {formatCurrency(student.remainingBalance || 0)}
+                  </div>
+                </div>
+              )) : (
+                <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                  No next payment dates are set yet.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

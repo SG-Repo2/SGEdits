@@ -1,60 +1,86 @@
+import { useMemo } from 'react';
 import { usePortal } from '../../app/providers/PortalProvider';
-import { EmptyState } from '../../components/common/EmptyState';
-import { MetricCard } from '../../components/common/MetricCard';
-import { PageIntro } from '../../components/common/PageIntro';
-import { SectionCard } from '../../components/common/SectionCard';
-import { formatDate } from '../../utils/date';
 import { formatCurrency } from '../../utils/formatters';
-import { getStudentPayments } from '../../utils/selectors';
 
 export function StudentPaymentsPage() {
-  const { currentStudent, payments } = usePortal();
+  const { currentStudent, getStudentPayments } = usePortal();
+
+  const payments = useMemo(
+    () => (currentStudent ? getStudentPayments(currentStudent.id) : []),
+    [currentStudent, getStudentPayments],
+  );
 
   if (!currentStudent) {
-    return <EmptyState description="Choose a student demo profile to view billing." title="Student profile missing" />;
+    return <div style={{ padding: 30, color: 'var(--text-muted)' }}>Loading your payments...</div>;
   }
 
-  const studentPayments = getStudentPayments(payments, currentStudent.id);
-  const contractValue = currentStudent.amountPaid + currentStudent.amountOwed;
-
   return (
-    <div className="page-stack">
-      <PageIntro
-        description="Students can see what has been paid, what remains open, and the latest invoice activity without needing the coach to send screenshots."
-        eyebrow="Student Portal"
-        title="Billing"
-      />
-
-      <div className="metric-grid metric-grid--three">
-        <MetricCard helper="Paid to date" label="Amount paid" value={formatCurrency(currentStudent.amountPaid)} />
-        <MetricCard helper="Current open balance" label="Amount owed" tone={currentStudent.amountOwed > 0 ? 'danger' : 'default'} value={formatCurrency(currentStudent.amountOwed)} />
-        <MetricCard helper={currentStudent.nextPaymentAmountLabel || 'No amount scheduled'} label="Contract value" value={formatCurrency(contractValue)} />
+    <div className="animate-in">
+      <div className="section-header" style={{ marginBottom: 24 }}>
+        <div>
+          <div className="section-header-title">Payments</div>
+          <div className="section-header-sub">
+            Your coach updates this manually so both sides see the same balance and payment log.
+          </div>
+        </div>
       </div>
 
-      <SectionCard title="Payment history">
+      <div className="stat-grid stat-grid-3" style={{ marginBottom: 18 }}>
+        <div className="stat-card">
+          <div className="stat-card-label">Amount Paid</div>
+          <div className="stat-card-value" style={{ color: 'var(--gold)' }}>{formatCurrency(currentStudent.amountPaid || 0)}</div>
+          <div className="stat-card-sub">recorded to date</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-card-label">Remaining Balance</div>
+          <div className="stat-card-value" style={{ color: currentStudent.remainingBalance > 0 ? 'var(--danger)' : 'var(--success)' }}>
+            {formatCurrency(currentStudent.remainingBalance || 0)}
+          </div>
+          <div className="stat-card-sub">still outstanding</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-card-label">Next Payment Date</div>
+          <div className="stat-card-value" style={{ color: 'var(--text-hi)' }}>{currentStudent.nextPaymentDate || 'Not set'}</div>
+          <div className="stat-card-sub">manual schedule</div>
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="panel-header">
+          <span className="panel-title">Payment Log</span>
+        </div>
         <div className="table-shell">
           <table className="data-table">
             <thead>
               <tr>
                 <th>Date</th>
-                <th>Type</th>
+                <th>Kind</th>
                 <th>Method</th>
                 <th>Amount</th>
+                <th>Note</th>
               </tr>
             </thead>
             <tbody>
-              {studentPayments.map((payment) => (
+              {payments.map((payment) => (
                 <tr key={payment.id}>
-                  <td>{formatDate(payment.date)}</td>
+                  <td>{payment.date}</td>
                   <td>{payment.kind}</td>
                   <td>{payment.method}</td>
                   <td>{formatCurrency(payment.amount)}</td>
+                  <td>{payment.note || '-'}</td>
                 </tr>
               ))}
+              {payments.length === 0 && (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                    No payment entries logged yet.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
-      </SectionCard>
+      </div>
     </div>
   );
 }

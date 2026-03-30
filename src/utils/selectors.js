@@ -51,8 +51,9 @@ export function getStudentInvoiceStatus(student) {
 }
 
 export function getCurrentWeeklyPlan(weeklyPlans, studentId, weekStart = getStartOfWeek()) {
+  if (!weeklyPlans || !studentId) return null;
   const key = getPlanId(studentId, typeof weekStart === 'string' ? weekStart : toISODate(weekStart));
-  return weeklyPlans[key] || null;
+  return weeklyPlans[key] || weeklyPlans[studentId] || null;
 }
 
 export function getStudentDirectory(students, sessions, payments, weeklyPlans, selfAssessments = {}) {

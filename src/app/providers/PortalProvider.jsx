@@ -1,478 +1,994 @@
-/**
- * PortalProvider.jsx
- *
- * Single context provider for the AceDAT Portal.
- * Loads seed data on mount, persists weeklyPlans and selfAssessments
- * to localStorage, and manages auth via a hardcoded credential map.
- *
- * Every data-loading function is marked with a // NOTION: comment
- * indicating where a Notion API call will replace the seed read.
- */
 import {
   createContext,
-  useContext,
-  useState,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
+  useState,
 } from 'react';
-import { students as seedStudents } from '../../data/students';
-import { sessions as seedSessions } from '../../data/sessions';
-import { payments as seedPayments } from '../../data/payments';
-import { weeklyPlans as seedWeeklyPlans } from '../../data/weeklyPlans';
-import { selfAssessments as seedSelfAssessments } from '../../data/selfAssessments';
+import { getPlanId } from '../../features/schedules/utils';
+import {
+  DAT_SECTIONS,
+  MQL_ERROR_TYPES,
+  WEEKDAY_META,
+  createEmptySectionScores,
+} from '../../data/manualWorkflow';
+import { compareByDateDesc, getStartOfWeek, toISODate } from '../../utils/date';
 
 const PortalContext = createContext(null);
 
-// ── LocalStorage keys ───────────────────────────────────────
 const LS_SESSION = 'acethedat.session';
-const LS_WEEKLY_PLANS = 'acethedat.weeklyPlans';
-const LS_SELF_ASSESSMENTS = 'acethedat.selfAssessments';
+const LS_USERS = 'acethedat.users';
 const LS_STUDENTS = 'acethedat.students';
+const LS_WEEKLY_PLANS = 'acethedat.weeklyPlans';
 const LS_TASK_COMPLETION = 'acethedat.taskCompletion';
 const LS_NOTES = 'acethedat.notes';
+const LS_MQL_ENTRIES = 'acethedat.mqlEntries';
+const LS_PRACTICE_TESTS = 'acethedat.practiceTests';
+const LS_STUDENT_PAYMENTS = 'acethedat.studentPayments';
+const LS_TEAM_PAYMENTS = 'acethedat.teamPayments';
+
+const LEGACY_DEMO_EMAIL_SUFFIX = '.demo';
+const BOOTSTRAP_COACH_ACCOUNT = Object.freeze({
+  email: 'thomas@acethedat.com',
+  password: 'Coach2024!',
+  profileId: 'coach-thomas',
+  role: 'coach',
+  name: 'Thomas',
+  studentId: null,
+  homePath: '/coach/dashboard',
+});
 
 function readLS(key) {
-  try { return JSON.parse(window.localStorage.getItem(key)); } catch { return null; }
+  if (typeof window === 'undefined') return null;
+  try {
+    return JSON.parse(window.localStorage.getItem(key));
+  } catch {
+    return null;
+  }
 }
+
 function writeLS(key, value) {
+  if (typeof window === 'undefined') return;
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 
-// ── Demo credential map ─────────────────────────────────────
-// NOTION: replace with Notion user lookup or lightweight auth service
-const DEMO_CREDENTIALS = {
-  'thomas@acethedat.com': {
-    password: 'Coach2024!',
-    profileId: 'coach-thomas',
-    role: 'coach',
-    name: 'Thomas',
-    studentId: null,
-    homePath: '/coach/dashboard',
-  },
-  // Student credentials: each student's email from the seed data
-  // with password pattern AceDAT-{FirstName}
-  ...Object.fromEntries(
-    seedStudents.map((s) => [
-      s.email,
-      {
-        password: `AceDAT-${s.name.split(' ')[0].replace(/[^a-zA-Z]/g, '')}`,
-        profileId: `student-${s.id}`,
-        role: 'student',
-        name: s.name,
-        studentId: s.id,
-        homePath: '/student/dashboard',
-      },
-    ])
-  ),
-};
+function getTodayLabel() {
+  return new Date().toLocaleDateString('en-US', { weekday: 'long' });
+}
 
-// ── Provider ────────────────────────────────────────────────
+function formatWeekLabel(weekStart) {
+  if (!weekStart) return 'This Week';
+  const start = new Date(`${weekStart}T00:00:00`);
+  if (Number.isNaN(start.valueOf())) return 'This Week';
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  const startLabel = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const endLabel = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return `${startLabel} - ${endLabel}`;
+}
+
+function isLegacyDemoEmail(email) {
+  return typeof email === 'string' && email.toLowerCase().endsWith(LEGACY_DEMO_EMAIL_SUFFIX);
+}
+
+function filterLegacyDemoStudents(students) {
+  return (Array.isArray(students) ? students : []).filter((student) => !isLegacyDemoEmail(student?.email));
+}
+
+function getNextStudentId(students) {
+  const nextNumber = (Array.isArray(students) ? students : []).reduce((max, student) => {
+    const numericId = Number(String(student?.id || '').replace(/\D/g, ''));
+    return Number.isFinite(numericId) ? Math.max(max, numericId) : max;
+  }, 0) + 1;
+
+  return `S${String(nextNumber).padStart(2, '0')}`;
+}
+
+function filterStudentScopedList(records, validStudentIds) {
+  return (Array.isArray(records) ? records : []).filter((record) => validStudentIds.has(record?.studentId));
+}
+
+function filterStudentScopedMap(records, validStudentIds) {
+  return Object.entries(records || {}).reduce((collection, [key, value]) => {
+    const studentId = value?.studentId || key.split(':')[0] || key;
+    if (validStudentIds.has(studentId)) {
+      collection[key] = value;
+    }
+    return collection;
+  }, {});
+}
+
+function normalizeUsers(users) {
+  const list = Array.isArray(users) ? users : Object.values(users || {});
+  const normalized = list.reduce((collection, user) => {
+    if (!user?.email) return collection;
+    collection[user.email.toLowerCase()] = {
+      ...user,
+      email: user.email.toLowerCase(),
+    };
+    return collection;
+  }, {});
+
+  if (!normalized[BOOTSTRAP_COACH_ACCOUNT.email]) {
+    normalized[BOOTSTRAP_COACH_ACCOUNT.email] = BOOTSTRAP_COACH_ACCOUNT;
+  }
+
+  return normalized;
+}
+
+function normalizeStudent(student) {
+  if (!student?.id || !student?.name) return null;
+
+  const amountPaid = Number(student.amountPaid ?? student.paymentSummary?.amountPaid ?? 0) || 0;
+  const remainingBalance = Number(
+    student.remainingBalance
+      ?? student.amountOwed
+      ?? student.paymentSummary?.remainingBalance
+      ?? 0,
+  ) || 0;
+  const nextPaymentDate = student.nextPaymentDate
+    || student.nextPaymentDue
+    || student.paymentSummary?.nextPaymentDate
+    || '';
+
+  return {
+    ...student,
+    name: student.name.trim(),
+    email: (student.email || '').trim().toLowerCase(),
+    initials: student.initials
+      || student.name
+        .split(' ')
+        .map((word) => word[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase(),
+    color: student.color || student.accentColor || '#C9A84C',
+    phone: student.phone || '',
+    status: student.status || 'Active',
+    program: student.program || student.focusArea || 'DAT Coaching',
+    phase: student.phase || 'Foundation',
+    testDate: student.testDate || student.targetExamDate || '',
+    targetExamDate: student.testDate || student.targetExamDate || '',
+    coachNote: student.coachNote || '',
+    weeklyCommitmentHours: Number(
+      student.weeklyCommitmentHours
+        ?? student.weeklyStudyHours
+        ?? student.weeklyHours
+        ?? 15,
+    ) || 15,
+    amountPaid,
+    remainingBalance,
+    amountOwed: remainingBalance,
+    nextPaymentDate,
+    nextPaymentDue: nextPaymentDate,
+  };
+}
+
+function getPlanTimestamp(plan) {
+  return new Date(
+    plan?.publishedAt
+      || plan?.savedAt
+      || plan?.createdAt
+      || plan?.weekStart
+      || plan?.weekOf
+      || 0,
+  ).getTime();
+}
+
+function getPlanWeekStart(plan) {
+  return plan?.weekStart || plan?.weekOf || toISODate(getStartOfWeek());
+}
+
+function createEmptyPlanTask(dayKey, taskIndex = 0) {
+  return {
+    id: `${dayKey.toLowerCase()}-${Date.now()}-${taskIndex}`,
+    text: '',
+    minutes: 45,
+    mins: 45,
+    note: '',
+  };
+}
+
+function normalizePlanTask(task, dayKey, taskIndex) {
+  const minutes = Number(task?.minutes ?? task?.mins ?? 45) || 45;
+  return {
+    ...task,
+    id: task?.id || `${dayKey.toLowerCase()}-${taskIndex}`,
+    text: task?.text || task?.title || task?.topic || '',
+    minutes,
+    mins: minutes,
+    note: task?.note || '',
+  };
+}
+
+function normalizePlanDay(day, index) {
+  const meta = WEEKDAY_META[index];
+  const dayKey = day?.id || meta.key;
+  const label = day?.label || meta.label;
+
+  return {
+    ...meta,
+    ...day,
+    id: dayKey,
+    label,
+    short: day?.short || meta.short,
+    isToday: label === getTodayLabel(),
+    tasks: (day?.tasks || []).map((task, taskIndex) => normalizePlanTask(task, dayKey, taskIndex)),
+  };
+}
+
+function createEmptyWeeklyPlan(studentId, weekStart = toISODate(getStartOfWeek())) {
+  return {
+    id: getPlanId(studentId, weekStart),
+    studentId,
+    weekStart,
+    weekOf: weekStart,
+    weekLabel: formatWeekLabel(weekStart),
+    status: 'draft',
+    days: WEEKDAY_META.map((day, index) => normalizePlanDay(day, index)),
+  };
+}
+
+function normalizeWeeklyPlan(plan) {
+  if (!plan) return null;
+
+  const weekStart = getPlanWeekStart(plan);
+  const basePlan = createEmptyWeeklyPlan(plan.studentId, weekStart);
+
+  if (Array.isArray(plan.days)) {
+    return {
+      ...basePlan,
+      ...plan,
+      id: getPlanId(plan.studentId, weekStart),
+      weekStart,
+      weekOf: plan.weekOf || weekStart,
+      weekLabel: plan.weekLabel || formatWeekLabel(weekStart),
+      status: plan.status || 'draft',
+      days: WEEKDAY_META.map((meta, index) => normalizePlanDay(plan.days[index] || meta, index)),
+    };
+  }
+
+  if (plan.days && typeof plan.days === 'object') {
+    return {
+      ...basePlan,
+      ...plan,
+      id: getPlanId(plan.studentId, weekStart),
+      weekStart,
+      weekOf: plan.weekOf || weekStart,
+      weekLabel: plan.weekLabel || formatWeekLabel(weekStart),
+      status: plan.status || 'draft',
+      days: WEEKDAY_META.map((meta, index) => normalizePlanDay({
+        ...meta,
+        tasks: plan.days[meta.key] || [],
+      }, index)),
+    };
+  }
+
+  return basePlan;
+}
+
+function normalizeStoredWeeklyPlans(plans, validStudentIds) {
+  return Object.entries(plans || {}).reduce((collection, [, plan]) => {
+    const studentId = plan?.studentId;
+    if (!studentId || !validStudentIds.has(studentId)) return collection;
+    const normalizedPlan = normalizeWeeklyPlan(plan);
+    if (!normalizedPlan) return collection;
+    collection[normalizedPlan.id] = normalizedPlan;
+    return collection;
+  }, {});
+}
+
+function buildWeeklyPlanHistory(plans) {
+  const history = {};
+
+  Object.values(plans || {}).forEach((plan) => {
+    if (!plan?.studentId) return;
+    if (!history[plan.studentId]) {
+      history[plan.studentId] = [];
+    }
+    history[plan.studentId].push(plan);
+  });
+
+  Object.keys(history).forEach((studentId) => {
+    history[studentId].sort((left, right) => getPlanTimestamp(right) - getPlanTimestamp(left));
+  });
+
+  return history;
+}
+
+function getCurrentWeeklyPlanRecord(weeklyPlans, studentId, weekStart = toISODate(getStartOfWeek())) {
+  if (!weeklyPlans || !studentId) return null;
+  return weeklyPlans[getPlanId(studentId, weekStart)] || null;
+}
+
+function getLatestWeeklyPlanRecord(weeklyPlans, studentId) {
+  return Object.values(weeklyPlans || {})
+    .filter((plan) => plan?.studentId === studentId)
+    .sort((left, right) => getPlanTimestamp(right) - getPlanTimestamp(left))[0] || null;
+}
+
+function getLatestPublishedPlanRecord(weeklyPlans, studentId) {
+  return Object.values(weeklyPlans || {})
+    .filter((plan) => plan?.studentId === studentId && plan?.status === 'published')
+    .sort((left, right) => getPlanTimestamp(right) - getPlanTimestamp(left))[0] || null;
+}
+
+function getPreferredStudentPlan(weeklyPlans, studentId) {
+  return (
+    getCurrentWeeklyPlanRecord(weeklyPlans, studentId)
+    || getLatestPublishedPlanRecord(weeklyPlans, studentId)
+    || getLatestWeeklyPlanRecord(weeklyPlans, studentId)
+    || null
+  );
+}
+
+function normalizeMqlEntry(entry) {
+  if (!entry?.studentId) return null;
+
+  const errorType = MQL_ERROR_TYPES.includes(entry.errorType)
+    ? entry.errorType
+    : (MQL_ERROR_TYPES.find((type) => type.toLowerCase() === String(entry.category || '').toLowerCase()) || '');
+
+  return {
+    id: entry.id || `mql-${Date.now()}`,
+    studentId: entry.studentId,
+    createdAt: entry.createdAt || new Date().toISOString(),
+    section: entry.section || '',
+    errorType,
+    questionReference: entry.questionReference
+      || [entry.examNumber, entry.questionNumber].filter(Boolean).join(' #')
+      || '',
+    explanation: entry.explanation || entry.whyMissed || entry.reasoning || '',
+    correctReasoning: entry.correctReasoning || entry.takeaway || '',
+    actionItem: entry.actionItem || entry.intervention || '',
+  };
+}
+
+function normalizePracticeTest(record) {
+  if (!record?.studentId) return null;
+
+  const sections = DAT_SECTIONS.reduce((collection, section) => {
+    const rawValue = record.sections?.[section] ?? record[section] ?? null;
+    if (rawValue === '' || rawValue === null || rawValue === undefined) {
+      collection[section] = null;
+      return collection;
+    }
+    const numericValue = Number(rawValue);
+    collection[section] = Number.isFinite(numericValue) ? numericValue : null;
+    return collection;
+  }, {});
+
+  return {
+    id: record.id || `pt-${Date.now()}`,
+    studentId: record.studentId,
+    testNumber: Math.min(15, Math.max(1, Number(record.testNumber) || 1)),
+    takenOn: record.takenOn || record.date || toISODate(new Date()),
+    sections,
+    notes: record.notes || '',
+    createdAt: record.createdAt || new Date().toISOString(),
+  };
+}
+
+function comparePracticeTests(left, right) {
+  if (left.testNumber !== right.testNumber) {
+    return left.testNumber - right.testNumber;
+  }
+  return new Date(left.takenOn).getTime() - new Date(right.takenOn).getTime();
+}
+
+function normalizeStudentPayment(payment) {
+  if (!payment?.studentId) return null;
+  return {
+    id: payment.id || `pay-${Date.now()}`,
+    studentId: payment.studentId,
+    date: payment.date || toISODate(new Date()),
+    amount: Number(payment.amount) || 0,
+    method: payment.method || 'Manual',
+    note: payment.note || '',
+    kind: payment.kind || 'Payment',
+  };
+}
+
+function normalizeTeamPayment(payment) {
+  return {
+    id: payment.id || `team-${Date.now()}`,
+    payee: payment.payee || '',
+    date: payment.date || toISODate(new Date()),
+    amount: Number(payment.amount) || 0,
+    note: payment.note || '',
+  };
+}
+
 export function PortalProvider({ children }) {
   const [session, setSession] = useState(null);
   const [currentProfile, setCurrentProfile] = useState(null);
   const [currentStudent, setCurrentStudent] = useState(null);
   const [students, setStudents] = useState([]);
-  const [sessionsData, setSessionsData] = useState([]);
-  const [paymentsData, setPaymentsData] = useState([]);
-  const [mqlErrors, setMqlErrors] = useState([]);
-  const [checkIns, setCheckIns] = useState({});
   const [weeklyPlans, setWeeklyPlans] = useState({});
   const [weeklyPlanHistory, setWeeklyPlanHistory] = useState({});
-  const [selfAssessments, setSelfAssessments] = useState({});
   const [taskCompletion, setTaskCompletion] = useState({});
   const [notes, setNotes] = useState({});
-  const [insights, setInsights] = useState([]);
+  const [mqlEntries, setMqlEntries] = useState([]);
+  const [practiceTests, setPracticeTests] = useState([]);
+  const [studentPayments, setStudentPayments] = useState([]);
+  const [teamPayments, setTeamPayments] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // ── Load all seed / persisted data ──────────────────────────
   const loadAllData = useCallback(() => {
-    // NOTION: replace this seed read with Notion API call — Students database
-    const storedStudents = readLS(LS_STUDENTS);
-    const loadedStudents = storedStudents && Array.isArray(storedStudents) ? storedStudents : [...seedStudents];
-    setStudents(loadedStudents);
+    const users = normalizeUsers(readLS(LS_USERS));
+    writeLS(LS_USERS, users);
 
-    // NOTION: replace this seed read with Notion API call — Sessions database
-    setSessionsData([...seedSessions]);
+    const storedStudents = filterLegacyDemoStudents(readLS(LS_STUDENTS) || [])
+      .map(normalizeStudent)
+      .filter(Boolean);
+    writeLS(LS_STUDENTS, storedStudents);
+    setStudents(storedStudents);
 
-    // NOTION: replace this seed read with Notion API call — Payments database
-    setPaymentsData([...seedPayments]);
+    const validStudentIds = new Set(storedStudents.map((student) => student.id));
 
-    // NOTION: replace this seed read with Notion API call — Weekly Plans database
-    const storedPlans = readLS(LS_WEEKLY_PLANS);
-    const loadedPlans = storedPlans || { ...seedWeeklyPlans };
-    setWeeklyPlans(loadedPlans);
+    const storedPlans = normalizeStoredWeeklyPlans(readLS(LS_WEEKLY_PLANS) || {}, validStudentIds);
+    writeLS(LS_WEEKLY_PLANS, storedPlans);
+    setWeeklyPlans(storedPlans);
+    setWeeklyPlanHistory(buildWeeklyPlanHistory(storedPlans));
 
-    // Build weekly plan history keyed by studentId
-    const histMap = {};
-    Object.values(loadedPlans).forEach((plan) => {
-      const sid = plan.studentId;
-      if (!sid) return;
-      if (!histMap[sid]) histMap[sid] = [];
-      histMap[sid].push(plan);
-    });
-    Object.keys(histMap).forEach((sid) =>
-      histMap[sid].sort((a, b) => new Date(b.weekStart || 0) - new Date(a.weekStart || 0))
-    );
-    setWeeklyPlanHistory(histMap);
+    const storedTaskCompletion = filterStudentScopedMap(readLS(LS_TASK_COMPLETION) || {}, validStudentIds);
+    const storedNotes = filterStudentScopedMap(readLS(LS_NOTES) || {}, validStudentIds);
+    writeLS(LS_TASK_COMPLETION, storedTaskCompletion);
+    writeLS(LS_NOTES, storedNotes);
+    setTaskCompletion(storedTaskCompletion);
+    setNotes(storedNotes);
 
-    // NOTION: replace this seed read with Notion API call — Self Assessments database
-    const storedSA = readLS(LS_SELF_ASSESSMENTS);
-    setSelfAssessments(storedSA || { ...seedSelfAssessments });
+    const storedMqlEntries = filterStudentScopedList(readLS(LS_MQL_ENTRIES) || [], validStudentIds)
+      .map(normalizeMqlEntry)
+      .filter(Boolean);
+    writeLS(LS_MQL_ENTRIES, storedMqlEntries);
+    setMqlEntries(storedMqlEntries);
 
-    // Task completion and notes from localStorage
-    setTaskCompletion(readLS(LS_TASK_COMPLETION) || {});
-    setNotes(readLS(LS_NOTES) || {});
+    const storedPracticeTests = filterStudentScopedList(readLS(LS_PRACTICE_TESTS) || [], validStudentIds)
+      .map(normalizePracticeTest)
+      .filter(Boolean)
+      .sort(comparePracticeTests);
+    writeLS(LS_PRACTICE_TESTS, storedPracticeTests);
+    setPracticeTests(storedPracticeTests);
 
-    // MQL errors and check-ins start empty (no seed data for these)
-    setMqlErrors([]);
-    setCheckIns({});
-    setInsights([]);
+    const storedStudentPayments = filterStudentScopedList(readLS(LS_STUDENT_PAYMENTS) || [], validStudentIds)
+      .map(normalizeStudentPayment)
+      .filter(Boolean)
+      .sort((left, right) => compareByDateDesc(left.date, right.date));
+    writeLS(LS_STUDENT_PAYMENTS, storedStudentPayments);
+    setStudentPayments(storedStudentPayments);
+
+    const storedTeamPayments = (Array.isArray(readLS(LS_TEAM_PAYMENTS)) ? readLS(LS_TEAM_PAYMENTS) : [])
+      .map(normalizeTeamPayment)
+      .sort((left, right) => compareByDateDesc(left.date, right.date));
+    writeLS(LS_TEAM_PAYMENTS, storedTeamPayments);
+    setTeamPayments(storedTeamPayments);
+
+    return { students: storedStudents, users };
   }, []);
 
-  // ── Restore session from localStorage on mount ──────────────
   useEffect(() => {
-    const stored = readLS(LS_SESSION);
-    if (stored && stored.role) {
-      setSession(stored);
-      setCurrentProfile({
-        id: stored.profileId,
-        role: stored.role,
-        name: stored.name,
-        studentId: stored.studentId || null,
-        homePath: stored.homePath || (stored.role === 'coach' ? '/coach/dashboard' : '/student/dashboard'),
-        label: stored.role === 'coach' ? 'Coach Workspace' : `${stored.name} Portal`,
-      });
-      loadAllData();
-      // Set currentStudent if student role
-      if (stored.studentId) {
-        const storedStudents = readLS(LS_STUDENTS);
-        const allStudents = storedStudents && Array.isArray(storedStudents) ? storedStudents : seedStudents;
-        const found = allStudents.find((s) => s.id === stored.studentId);
-        if (found) setCurrentStudent(found);
+    const storedSession = readLS(LS_SESSION);
+    const { students: loadedStudents } = loadAllData();
+
+    if (storedSession?.role) {
+      const restoredStudent = storedSession.studentId
+        ? loadedStudents.find((student) => student.id === storedSession.studentId) || null
+        : null;
+
+      if (storedSession.role === 'student' && !restoredStudent) {
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem(LS_SESSION);
+        }
+        setLoading(false);
+        return;
       }
+
+      setSession(storedSession);
+      setCurrentProfile({
+        id: storedSession.profileId,
+        role: storedSession.role,
+        name: storedSession.name,
+        email: storedSession.email || '',
+        studentId: storedSession.studentId || null,
+        homePath: storedSession.homePath || (storedSession.role === 'coach' ? '/coach/dashboard' : '/student/dashboard'),
+        label: storedSession.role === 'coach' ? 'Coach Workspace' : `${storedSession.name} Portal`,
+      });
+      setCurrentStudent(restoredStudent);
     }
+
     setLoading(false);
   }, [loadAllData]);
 
-  // ── Auth ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (session?.role === 'student' && session.studentId) {
+      setCurrentStudent(students.find((student) => student.id === session.studentId) || null);
+    }
+  }, [session, students]);
+
   const loginWithCredentials = useCallback(async (email, password) => {
-    const cred = DEMO_CREDENTIALS[email.toLowerCase()];
-    if (!cred || cred.password !== password) {
+    const users = normalizeUsers(readLS(LS_USERS));
+    writeLS(LS_USERS, users);
+
+    const credential = users[email.trim().toLowerCase()];
+    if (!credential || credential.password !== password) {
       return { success: false, error: 'Invalid email or password' };
     }
 
-    const sess = {
-      profileId: cred.profileId,
-      role: cred.role,
-      name: cred.name,
-      studentId: cred.studentId,
-      homePath: cred.homePath,
+    const nextSession = {
+      email: credential.email,
+      profileId: credential.profileId,
+      role: credential.role,
+      name: credential.name,
+      studentId: credential.studentId,
+      homePath: credential.homePath,
     };
-    writeLS(LS_SESSION, sess);
-    setSession(sess);
+
+    writeLS(LS_SESSION, nextSession);
+    setSession(nextSession);
 
     const profile = {
-      id: cred.profileId,
-      role: cred.role,
-      name: cred.name,
-      studentId: cred.studentId,
-      homePath: cred.homePath,
-      label: cred.role === 'coach' ? 'Coach Workspace' : `${cred.name} Portal`,
+      id: credential.profileId,
+      role: credential.role,
+      name: credential.name,
+      email: credential.email,
+      studentId: credential.studentId,
+      homePath: credential.homePath,
+      label: credential.role === 'coach' ? 'Coach Workspace' : `${credential.name} Portal`,
     };
     setCurrentProfile(profile);
 
-    loadAllData();
-
-    if (cred.studentId) {
-      const found = seedStudents.find((s) => s.id === cred.studentId);
-      if (found) setCurrentStudent(found);
+    const { students: loadedStudents } = loadAllData();
+    if (credential.studentId) {
+      const foundStudent = loadedStudents.find((student) => student.id === credential.studentId) || null;
+      if (!foundStudent) {
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem(LS_SESSION);
+        }
+        setSession(null);
+        setCurrentProfile(null);
+        setCurrentStudent(null);
+        return { success: false, error: 'This student account is no longer active.' };
+      }
+      setCurrentStudent(foundStudent);
+    } else {
+      setCurrentStudent(null);
     }
 
     return { success: true, profile };
   }, [loadAllData]);
 
   const logout = useCallback(() => {
-    window.localStorage.removeItem(LS_SESSION);
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(LS_SESSION);
+    }
     setSession(null);
     setCurrentProfile(null);
     setCurrentStudent(null);
-    setStudents([]);
-    setSessionsData([]);
-    setPaymentsData([]);
-    setMqlErrors([]);
-    setCheckIns({});
-    setWeeklyPlans({});
-    setWeeklyPlanHistory({});
-    setSelfAssessments({});
-    setTaskCompletion({});
-    setNotes({});
-    setInsights([]);
   }, []);
 
-  // ── Students ────────────────────────────────────────────────
-  // NOTION: replace with Notion page creation in Students database
   const addStudent = useCallback(async (studentData) => {
-    const id = `S${String(students.length + 1).padStart(2, '0')}`;
-    const newStudent = {
+    const email = (studentData.email || '').trim().toLowerCase();
+    const password = studentData.password || '';
+
+    if (!studentData.name?.trim()) {
+      return { success: false, error: 'Name is required.' };
+    }
+    if (!email || !email.includes('@')) {
+      return { success: false, error: 'Valid email is required.' };
+    }
+    if (isLegacyDemoEmail(email)) {
+      return { success: false, error: 'Please use a real email address.' };
+    }
+    if (password.length < 6) {
+      return { success: false, error: 'Password must be at least 6 characters.' };
+    }
+
+    const existingUsers = normalizeUsers(readLS(LS_USERS));
+    if (existingUsers[email] || students.some((student) => student.email === email)) {
+      return { success: false, error: 'An account with this email already exists.' };
+    }
+
+    const id = getNextStudentId(students);
+    const student = normalizeStudent({
       id,
-      name: studentData.name || '',
-      email: studentData.email || '',
-      initials: (studentData.name || '').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() || '??',
-      color: '#C9A84C',
+      name: studentData.name,
+      email,
       phone: studentData.phone || '',
-      targetAA: studentData.targetAA || 22,
-      predicted: null,
-      sections: studentData.sections || { Bio: 0, GC: 0, OC: 0, RC: 0, QR: 0, PAT: 0, TS: 0 },
-      program: studentData.program || 'Full DAT',
+      program: studentData.program || 'DAT Coaching',
       phase: studentData.phase || 'Foundation',
-      testDate: studentData.testDate || null,
-      coachNote: '',
-      weakAreas: studentData.weakAreas || [],
-      focusTags: [],
-      ceiling: null,
-      coachId: studentData.coachId || null,
+      testDate: studentData.testDate || '',
+      weeklyCommitmentHours: studentData.weeklyCommitmentHours || 15,
       status: 'Active',
-      primaryCoach: 'Thomas',
+      coachNote: '',
+      amountPaid: 0,
+      remainingBalance: 0,
+      nextPaymentDate: '',
+    });
+
+    const nextStudents = [...students, student];
+    setStudents(nextStudents);
+    writeLS(LS_STUDENTS, nextStudents);
+
+    const nextUsers = {
+      ...existingUsers,
+      [email]: {
+        email,
+        password,
+        profileId: `student-${id}`,
+        role: 'student',
+        name: student.name,
+        studentId: id,
+        homePath: '/student/dashboard',
+      },
     };
-    const next = [...students, newStudent];
-    setStudents(next);
-    writeLS(LS_STUDENTS, next);
-    return { success: true, tempPassword: null, authUserCreated: false, student: newStudent };
+    writeLS(LS_USERS, nextUsers);
+
+    return { success: true, student, user: nextUsers[email] };
   }, [students]);
 
-  // NOTION: replace with Notion page update in Students database
   const updateStudent = useCallback((studentId, updates) => {
-    setStudents((prev) => {
-      const next = prev.map((s) => (s.id === studentId ? { ...s, ...updates } : s));
-      writeLS(LS_STUDENTS, next);
-      return next;
+    setStudents((previousStudents) => {
+      const nextStudents = previousStudents.map((student) => {
+        if (student.id !== studentId) return student;
+        return normalizeStudent({
+          ...student,
+          ...updates,
+          amountPaid: updates.amountPaid ?? student.amountPaid,
+          remainingBalance: updates.remainingBalance ?? updates.amountOwed ?? student.remainingBalance,
+          nextPaymentDate: updates.nextPaymentDate ?? updates.nextPaymentDue ?? student.nextPaymentDate,
+        });
+      }).filter(Boolean);
+      writeLS(LS_STUDENTS, nextStudents);
+      return nextStudents;
     });
-    if (currentStudent?.id === studentId) {
-      setCurrentStudent((prev) => ({ ...prev, ...updates }));
-    }
-  }, [currentStudent]);
+  }, []);
 
   const updateStudentSections = useCallback((studentId, sections) => {
     updateStudent(studentId, { sections });
   }, [updateStudent]);
 
-  // ── Task Completion ─────────────────────────────────────────
+  const updateStudentPaymentSummary = useCallback((studentId, summary) => {
+    updateStudent(studentId, {
+      amountPaid: Number(summary.amountPaid) || 0,
+      remainingBalance: Number(summary.remainingBalance) || 0,
+      nextPaymentDate: summary.nextPaymentDate || '',
+    });
+  }, [updateStudent]);
+
   const toggleTask = useCallback((taskId) => {
-    if (!currentStudent) return;
+    if (!currentStudent?.id) return;
     const key = `${currentStudent.id}:${taskId}`;
-    setTaskCompletion((prev) => {
-      const next = { ...prev, [key]: !prev[key] };
-      writeLS(LS_TASK_COMPLETION, next);
-      return next;
+    setTaskCompletion((previousCompletion) => {
+      const nextCompletion = {
+        ...previousCompletion,
+        [key]: !previousCompletion[key],
+      };
+      writeLS(LS_TASK_COMPLETION, nextCompletion);
+      return nextCompletion;
     });
   }, [currentStudent]);
 
-  // ── Notes ───────────────────────────────────────────────────
   const saveNote = useCallback((dayId, text) => {
-    if (!currentStudent) return;
+    if (!currentStudent?.id) return;
     const key = `${currentStudent.id}:${dayId}`;
-    setNotes((prev) => {
-      const next = { ...prev, [key]: text };
-      writeLS(LS_NOTES, next);
-      return next;
+    setNotes((previousNotes) => {
+      const nextNotes = {
+        ...previousNotes,
+        [key]: text,
+      };
+      writeLS(LS_NOTES, nextNotes);
+      return nextNotes;
     });
   }, [currentStudent]);
 
-  // ── MQL Errors ──────────────────────────────────────────────
-  // NOTION: replace with Notion page creation in MQL Errors database
-  const addMqlError = useCallback((error) => {
-    if (!currentStudent) return;
-    const newError = {
-      id: `mql-${Date.now()}`,
-      studentId: currentStudent.id,
-      date: new Date().toISOString().split('T')[0],
-      section: error.section || '',
-      subtopic: error.subtopic || '',
-      source: error.source || '',
-      examNumber: error.examNumber || '',
-      questionNumber: error.questionNumber || '',
-      errorType: error.errorType || '',
-      confidenceBefore: error.confidenceBefore || 0,
-      whyMissed: error.whyMissed || '',
-      takeaway: error.takeaway || '',
-      reviewed: error.reviewed || false,
-      stillWeak: error.stillWeak || false,
-      includeInNextPlan: error.includeInNextPlan || false,
-      category: error.category || '',
-    };
-    setMqlErrors((prev) => [newError, ...prev]);
-  }, [currentStudent]);
-
-  // NOTION: replace with Notion page creation in MQL Errors database (coach path)
-  const addMqlErrorForStudent = useCallback((studentId, error) => {
-    const newError = {
-      id: `mql-${Date.now()}`,
-      studentId,
-      date: new Date().toISOString().split('T')[0],
-      section: error.section || '',
-      subtopic: error.subtopic || '',
-      source: error.source || '',
-      examNumber: error.examNumber || '',
-      questionNumber: error.questionNumber || '',
-      errorType: error.errorType || '',
-      confidenceBefore: error.confidenceBefore || 0,
-      whyMissed: error.whyMissed || '',
-      takeaway: error.takeaway || '',
-      reviewed: error.reviewed || false,
-      stillWeak: error.stillWeak || false,
-      includeInNextPlan: error.includeInNextPlan || false,
-      category: error.category || '',
-    };
-    setMqlErrors((prev) => [newError, ...prev]);
-  }, []);
-
-  // NOTION: replace with Notion page update in MQL Errors database
-  const updateMqlError = useCallback((errorId, updates) => {
-    setMqlErrors((prev) => prev.map((e) => (e.id === errorId ? { ...e, ...updates } : e)));
-  }, []);
-
-  // NOTION: replace with Notion page archive/delete in MQL Errors database
-  const deleteMqlError = useCallback((errorId) => {
-    setMqlErrors((prev) => prev.filter((e) => e.id !== errorId));
-  }, []);
-
-  // ── Check-Ins ───────────────────────────────────────────────
-  // NOTION: replace with Notion page creation in Check-Ins database
-  const submitCheckIn = useCallback((studentId, weekId, data) => {
-    const ci = {
-      id: `ci-${Date.now()}`,
-      studentId,
-      weekId,
-      submittedAt: new Date().toISOString(),
-      ...data,
-    };
-    setCheckIns((prev) => ({ ...prev, [`${studentId}:${weekId}`]: ci }));
-  }, []);
-
-  const getCheckIns = useCallback((studentId) => {
-    return Object.entries(checkIns)
-      .filter(([key]) => key.startsWith(`${studentId}:`))
-      .map(([, v]) => v)
-      .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
-  }, [checkIns]);
-
-  const getLatestCheckIn = useCallback((studentId) => {
-    const all = getCheckIns(studentId);
-    return all[0] || null;
-  }, [getCheckIns]);
-
-  // ── Weekly Plans ────────────────────────────────────────────
-  // NOTION: replace with Notion page creation/update in Weekly Plans database
   const saveWeeklyPlan = useCallback((studentId, plan) => {
-    const planId = plan.id || `wp-local-${Date.now()}`;
-    const saved = { ...plan, id: planId, studentId, savedAt: new Date().toISOString() };
+    const normalizedPlan = normalizeWeeklyPlan({
+      ...plan,
+      studentId,
+    });
+    const savedPlan = {
+      ...normalizedPlan,
+      savedAt: new Date().toISOString(),
+    };
 
-    setWeeklyPlans((prev) => {
-      const next = { ...prev, [studentId]: saved };
-      writeLS(LS_WEEKLY_PLANS, next);
-      return next;
+    setWeeklyPlans((previousPlans) => {
+      const nextPlans = {
+        ...previousPlans,
+        [savedPlan.id]: savedPlan,
+      };
+      writeLS(LS_WEEKLY_PLANS, nextPlans);
+      return nextPlans;
     });
 
-    setWeeklyPlanHistory((prev) => {
-      const existing = (prev[studentId] || []).filter((p) => p.id !== planId);
-      return { ...prev, [studentId]: [saved, ...existing] };
+    setWeeklyPlanHistory((previousHistory) => {
+      const existingPlans = (previousHistory[studentId] || []).filter((existingPlan) => existingPlan.id !== savedPlan.id);
+      return {
+        ...previousHistory,
+        [studentId]: [savedPlan, ...existingPlans].sort((left, right) => getPlanTimestamp(right) - getPlanTimestamp(left)),
+      };
     });
+
+    return savedPlan;
   }, []);
 
-  // NOTION: replace with Notion query for Weekly Plans database filtered by studentId
-  const getWeeklyPlan = useCallback((studentId) => weeklyPlans[studentId] || null, [weeklyPlans]);
-
-  // NOTION: replace with Notion page update in Weekly Plans database (status → published)
   const publishWeeklyPlan = useCallback((studentId, planId) => {
-    setWeeklyPlans((prev) => {
-      const plan = prev[studentId];
-      if (!plan) return prev;
-      const updated = { ...plan, status: 'published', publishedAt: new Date().toISOString() };
-      const next = { ...prev, [studentId]: updated };
-      writeLS(LS_WEEKLY_PLANS, next);
-      return next;
+    let publishedPlan = null;
+
+    setWeeklyPlans((previousPlans) => {
+      const currentPlan = previousPlans[planId]
+        || getCurrentWeeklyPlanRecord(previousPlans, studentId)
+        || getLatestWeeklyPlanRecord(previousPlans, studentId);
+      if (!currentPlan) return previousPlans;
+
+      publishedPlan = {
+        ...currentPlan,
+        status: 'published',
+        publishedAt: currentPlan.publishedAt || new Date().toISOString(),
+        savedAt: new Date().toISOString(),
+      };
+
+      const nextPlans = {
+        ...previousPlans,
+        [publishedPlan.id]: publishedPlan,
+      };
+      writeLS(LS_WEEKLY_PLANS, nextPlans);
+      return nextPlans;
+    });
+
+    if (publishedPlan) {
+      setWeeklyPlanHistory((previousHistory) => {
+        const existingPlans = (previousHistory[studentId] || []).filter((plan) => plan.id !== publishedPlan.id);
+        return {
+          ...previousHistory,
+          [studentId]: [publishedPlan, ...existingPlans].sort((left, right) => getPlanTimestamp(right) - getPlanTimestamp(left)),
+        };
+      });
+    }
+
+    return publishedPlan;
+  }, []);
+
+  const getWeeklyPlan = useCallback((studentId, weekStart) => {
+    if (!studentId) return null;
+    if (weekStart) {
+      return normalizeWeeklyPlan(getCurrentWeeklyPlanRecord(weeklyPlans, studentId, weekStart));
+    }
+    return normalizeWeeklyPlan(getPreferredStudentPlan(weeklyPlans, studentId));
+  }, [weeklyPlans]);
+
+  const createWeeklyPlanDraft = useCallback((studentId, weekStart = toISODate(getStartOfWeek())) => (
+    createEmptyWeeklyPlan(studentId, weekStart)
+  ), []);
+
+  const addMqlError = useCallback((entry) => {
+    const studentId = entry.studentId || currentStudent?.id;
+    if (!studentId) return null;
+
+    const normalizedEntry = normalizeMqlEntry({
+      ...entry,
+      studentId,
+    });
+    if (!normalizedEntry) return null;
+
+    setMqlEntries((previousEntries) => {
+      const nextEntries = [normalizedEntry, ...previousEntries];
+      writeLS(LS_MQL_ENTRIES, nextEntries);
+      return nextEntries;
+    });
+
+    return normalizedEntry;
+  }, [currentStudent]);
+
+  const addMqlErrorForStudent = useCallback((studentId, entry) => {
+    return addMqlError({ ...entry, studentId });
+  }, [addMqlError]);
+
+  const updateMqlError = useCallback((entryId, updates) => {
+    setMqlEntries((previousEntries) => {
+      const nextEntries = previousEntries.map((entry) => (
+        entry.id === entryId
+          ? normalizeMqlEntry({ ...entry, ...updates })
+          : entry
+      )).filter(Boolean);
+      writeLS(LS_MQL_ENTRIES, nextEntries);
+      return nextEntries;
     });
   }, []);
 
-  // ── Self Assessments ────────────────────────────────────────
-  // NOTION: replace with Notion page update in Self Assessments database
-  const saveSelfAssessment = useCallback((studentId, assessment) => {
-    setSelfAssessments((prev) => {
-      const next = { ...prev, [studentId]: { ...assessment, studentId, updatedAt: new Date().toISOString() } };
-      writeLS(LS_SELF_ASSESSMENTS, next);
-      return next;
+  const deleteMqlError = useCallback((entryId) => {
+    setMqlEntries((previousEntries) => {
+      const nextEntries = previousEntries.filter((entry) => entry.id !== entryId);
+      writeLS(LS_MQL_ENTRIES, nextEntries);
+      return nextEntries;
     });
   }, []);
 
-  // ── Insights ────────────────────────────────────────────────
-  // NOTION: replace with Notion page creation in Insights database
-  const addInsight = useCallback((insight) => {
-    const newInsight = { ...insight, id: `ins-${Date.now()}`, created_at: new Date().toISOString() };
-    setInsights((prev) => [newInsight, ...prev]);
+  const getStudentMqlEntries = useCallback((studentId) => (
+    mqlEntries
+      .filter((entry) => entry.studentId === studentId)
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+  ), [mqlEntries]);
+
+  const savePracticeTest = useCallback((studentId, record) => {
+    const normalizedRecord = normalizePracticeTest({
+      ...record,
+      studentId,
+    });
+    if (!normalizedRecord) return null;
+
+    setPracticeTests((previousTests) => {
+      const nextTests = previousTests
+        .filter((test) => !(test.studentId === studentId && (
+          test.id === normalizedRecord.id || test.testNumber === normalizedRecord.testNumber
+        )))
+        .concat(normalizedRecord)
+        .sort(comparePracticeTests);
+      writeLS(LS_PRACTICE_TESTS, nextTests);
+      return nextTests;
+    });
+
+    return normalizedRecord;
   }, []);
 
-  // NOTION: replace with Notion page update in Insights database
-  const updateInsight = useCallback((insightId, updates) => {
-    setInsights((prev) => prev.map((i) => (i.id === insightId ? { ...i, ...updates } : i)));
+  const deletePracticeTest = useCallback((recordId) => {
+    setPracticeTests((previousTests) => {
+      const nextTests = previousTests.filter((test) => test.id !== recordId);
+      writeLS(LS_PRACTICE_TESTS, nextTests);
+      return nextTests;
+    });
   }, []);
 
-  // ── Derived state ───────────────────────────────────────────
+  const getStudentPracticeTests = useCallback((studentId) => (
+    practiceTests
+      .filter((test) => test.studentId === studentId)
+      .sort(comparePracticeTests)
+  ), [practiceTests]);
+
+  const saveStudentPayment = useCallback((studentId, payment) => {
+    const normalizedPayment = normalizeStudentPayment({
+      ...payment,
+      studentId,
+    });
+    if (!normalizedPayment) return null;
+
+    setStudentPayments((previousPayments) => {
+      const nextPayments = previousPayments
+        .filter((existingPayment) => existingPayment.id !== normalizedPayment.id)
+        .concat(normalizedPayment)
+        .sort((left, right) => compareByDateDesc(left.date, right.date));
+      writeLS(LS_STUDENT_PAYMENTS, nextPayments);
+      return nextPayments;
+    });
+
+    return normalizedPayment;
+  }, []);
+
+  const deleteStudentPayment = useCallback((paymentId) => {
+    setStudentPayments((previousPayments) => {
+      const nextPayments = previousPayments.filter((payment) => payment.id !== paymentId);
+      writeLS(LS_STUDENT_PAYMENTS, nextPayments);
+      return nextPayments;
+    });
+  }, []);
+
+  const saveTeamPayment = useCallback((payment) => {
+    const normalizedPayment = normalizeTeamPayment(payment);
+    setTeamPayments((previousPayments) => {
+      const nextPayments = previousPayments
+        .filter((existingPayment) => existingPayment.id !== normalizedPayment.id)
+        .concat(normalizedPayment)
+        .sort((left, right) => compareByDateDesc(left.date, right.date));
+      writeLS(LS_TEAM_PAYMENTS, nextPayments);
+      return nextPayments;
+    });
+    return normalizedPayment;
+  }, []);
+
+  const deleteTeamPayment = useCallback((paymentId) => {
+    setTeamPayments((previousPayments) => {
+      const nextPayments = previousPayments.filter((payment) => payment.id !== paymentId);
+      writeLS(LS_TEAM_PAYMENTS, nextPayments);
+      return nextPayments;
+    });
+  }, []);
+
+  const getStudentPayments = useCallback((studentId) => (
+    studentPayments
+      .filter((payment) => payment.studentId === studentId)
+      .sort((left, right) => compareByDateDesc(left.date, right.date))
+  ), [studentPayments]);
+
   const weeklyPlan = useMemo(() => {
-    if (!currentStudent) return null;
-    return weeklyPlans[currentStudent.id] || null;
+    if (!currentStudent?.id) return null;
+    const plan = getPreferredStudentPlan(weeklyPlans, currentStudent.id);
+    return normalizeWeeklyPlan(plan);
   }, [currentStudent, weeklyPlans]);
 
-  // ── Context value ───────────────────────────────────────────
   const value = useMemo(() => ({
     session,
     loading,
     currentProfile,
     currentStudent,
     students,
-    sessions: sessionsData,
-    payments: paymentsData,
-    mqlErrors,
-    checkIns,
     weeklyPlan,
     weeklyPlans,
     weeklyPlanHistory,
-    selfAssessments,
     taskCompletion,
     notes,
-    insights,
+    mqlEntries,
+    mqlErrors: mqlEntries,
+    practiceTests,
+    payments: studentPayments,
+    studentPayments,
+    teamPayments,
     loginWithCredentials,
     logout,
     addStudent,
     updateStudent,
     updateStudentSections,
+    updateStudentPaymentSummary,
     toggleTask,
     saveNote,
+    saveWeeklyPlan,
+    publishWeeklyPlan,
+    getWeeklyPlan,
+    createWeeklyPlanDraft,
     addMqlError,
     addMqlErrorForStudent,
     updateMqlError,
     deleteMqlError,
-    submitCheckIn,
-    getCheckIns,
-    getLatestCheckIn,
-    saveWeeklyPlan,
-    getWeeklyPlan,
-    publishWeeklyPlan,
-    saveSelfAssessment,
-    addInsight,
-    updateInsight,
+    getStudentMqlEntries,
+    savePracticeTest,
+    deletePracticeTest,
+    getStudentPracticeTests,
+    saveStudentPayment,
+    deleteStudentPayment,
+    getStudentPayments,
+    saveTeamPayment,
+    deleteTeamPayment,
+    createEmptySectionScores,
   }), [
-    session, loading, currentProfile, currentStudent,
-    students, sessionsData, paymentsData,
-    mqlErrors, checkIns, weeklyPlan, weeklyPlans, weeklyPlanHistory,
-    selfAssessments, taskCompletion, notes, insights,
-    loginWithCredentials, logout,
-    addStudent, updateStudent, updateStudentSections,
-    toggleTask, saveNote,
-    addMqlError, addMqlErrorForStudent, updateMqlError, deleteMqlError,
-    submitCheckIn, getCheckIns, getLatestCheckIn,
-    saveWeeklyPlan, getWeeklyPlan, publishWeeklyPlan,
-    saveSelfAssessment, addInsight, updateInsight,
+    session,
+    loading,
+    currentProfile,
+    currentStudent,
+    students,
+    weeklyPlan,
+    weeklyPlans,
+    weeklyPlanHistory,
+    taskCompletion,
+    notes,
+    mqlEntries,
+    practiceTests,
+    studentPayments,
+    teamPayments,
+    loginWithCredentials,
+    logout,
+    addStudent,
+    updateStudent,
+    updateStudentSections,
+    updateStudentPaymentSummary,
+    toggleTask,
+    saveNote,
+    saveWeeklyPlan,
+    publishWeeklyPlan,
+    getWeeklyPlan,
+    createWeeklyPlanDraft,
+    addMqlError,
+    addMqlErrorForStudent,
+    updateMqlError,
+    deleteMqlError,
+    getStudentMqlEntries,
+    savePracticeTest,
+    deletePracticeTest,
+    getStudentPracticeTests,
+    saveStudentPayment,
+    deleteStudentPayment,
+    getStudentPayments,
+    saveTeamPayment,
+    deleteTeamPayment,
   ]);
 
   return (
@@ -483,7 +999,9 @@ export function PortalProvider({ children }) {
 }
 
 export function usePortal() {
-  const ctx = useContext(PortalContext);
-  if (!ctx) throw new Error('usePortal must be used inside PortalProvider');
-  return ctx;
+  const context = useContext(PortalContext);
+  if (!context) {
+    throw new Error('usePortal must be used inside PortalProvider');
+  }
+  return context;
 }

@@ -36,9 +36,8 @@ function groupByTopic(questions) {
 }
 
 export default function StudentMissedQuestions({ studentId }) {
-  const { students, updateMissedQuestion, addMissedQuestion, currentUser } = usePortal();
-  const id = studentId || currentUser?.id;
-  const student = students.find(s => s.id === id);
+  const { students, updateMissedQuestion, addMissedQuestion, currentStudent } = usePortal();
+  const student = studentId ? students.find((s) => s.id === studentId) : currentStudent;
 
   const [activeSection, setActiveSection] = useState('All');
   const [groupBy, setGroupBy] = useState('section'); // 'section' | 'topic' | 'status'
