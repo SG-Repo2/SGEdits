@@ -115,7 +115,7 @@ export function CoachSchedulesPage() {
             Reset demo plans
           </Button>
         }
-        description="Plans are editable in memory, persisted to local storage, and intentionally shaped so a Supabase repository can replace the demo repository later."
+        description="Plans are editable in memory and persisted to local storage. Notion API integration will replace local storage."
         eyebrow="Coach Portal"
         title="Schedules"
       />

@@ -1,5 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { SupabaseProvider, usePortal } from './app/providers/SupabaseProvider';
+import { PortalProvider, usePortal } from './app/providers/PortalProvider';
 import { PortalLayout } from './layouts/PortalLayout';
 import { LoginPage } from './pages/auth/LoginPage';
 import { StudentDashboard } from './pages/student/StudentDashboard';
@@ -16,17 +16,17 @@ import { CoachSessionFlow } from './pages/coach/CoachSessionFlow';
 import { CoachScheduleBuilder } from './pages/coach/CoachScheduleBuilder';
 import { CoachPlanningHub } from './pages/coach/CoachPlanningHub';
 
-const LoadingScreen = () => (
-  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#0a1f0f' }}>
-    <div style={{ textAlign: 'center', color: '#c9a84c' }}>
-      <div style={{ fontSize: '1.2rem', letterSpacing: '0.1em' }}>Loading...</div>
-    </div>
-  </div>
-);
-
 function RequireAuth({ children }) {
   const { session, loading } = usePortal();
-  if (loading) return <LoadingScreen />;
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#0a1f0f' }}>
+        <div style={{ textAlign: 'center', color: '#c9a84c' }}>
+          <div style={{ fontSize: '1.2rem', letterSpacing: '0.1em' }}>Loading...</div>
+        </div>
+      </div>
+    );
+  }
   if (!session) return <Navigate replace to="/login" />;
   return children;
 }
@@ -49,12 +49,14 @@ function RoleRedirect() {
 
 export default function App() {
   return (
-    <SupabaseProvider>
+    <PortalProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<RequireAuth><PortalLayout /></RequireAuth>}>
             <Route index element={<RoleRedirect />} />
+
+            {/* Student routes */}
             <Route path="student/dashboard" element={<RequireRole role="student"><StudentDashboard /></RequireRole>} />
             <Route path="student/weekly-plan" element={<RequireRole role="student"><StudentWeeklyPlan /></RequireRole>} />
             <Route path="student/sections" element={<RequireRole role="student"><StudentSections /></RequireRole>} />
@@ -62,6 +64,9 @@ export default function App() {
             <Route path="student/check-in" element={<RequireRole role="student"><StudentCheckIn /></RequireRole>} />
             <Route path="student/missed-questions" element={<RequireRole role="student"><StudentMissedQuestions /></RequireRole>} />
             <Route path="student/progress" element={<RequireRole role="student"><StudentProgress /></RequireRole>} />
+            <Route path="student/self-assessment" element={<RequireRole role="student"><div style={{padding:40}}>Coming soon</div></RequireRole>} />
+
+            {/* Coach routes */}
             <Route path="coach/dashboard" element={<RequireRole role="coach"><CoachDashboard /></RequireRole>} />
             <Route path="coach/students" element={<RequireRole role="coach"><CoachStudents /></RequireRole>} />
             <Route path="coach/diagnostic" element={<RequireRole role="coach"><CoachDiagnostic /></RequireRole>} />
@@ -72,6 +77,6 @@ export default function App() {
           <Route path="*" element={<Navigate replace to="/" />} />
         </Routes>
       </BrowserRouter>
-    </SupabaseProvider>
+    </PortalProvider>
   );
 }

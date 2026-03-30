@@ -69,7 +69,7 @@ function AddStudentModal({ onClose, onAdd }) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 }}>
               <div>
                 <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-hi)' }}>Add New Student</div>
-                <div style={{ fontSize: 12, color: 'var(--text-lo)', marginTop: 3 }}>Creates a Supabase account — no email sent to student.</div>
+                <div style={{ fontSize: 12, color: 'var(--text-lo)', marginTop: 3 }}>Add a new student to the portal.</div>
               </div>
               <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--text-lo)' }}><X size={20} /></button>
             </div>

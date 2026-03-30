@@ -4,7 +4,7 @@ import { studentNavigation, coachNavigation } from '../config/navigation';
 import { LogOut } from 'lucide-react';
 
 export function PortalLayout() {
-  const { currentProfile, logout, isDemoMode, profiles } = usePortal();
+  const { currentProfile, logout } = usePortal();
   const location = useLocation();
   const navigate = useNavigate();
   const nav = currentProfile?.role === 'coach' ? coachNavigation : studentNavigation;
@@ -16,7 +16,6 @@ export function PortalLayout() {
       <nav className="nav">
         <div className="nav-logo">Ace The <em>DAT</em></div>
         <div className="nav-right">
-          {isDemoMode && <span className="tag tag-gold">Demo Mode</span>}
           <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-lo)', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
             {currentProfile?.name}
           </span>

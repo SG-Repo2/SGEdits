@@ -48,7 +48,7 @@ export const SESSION_CADENCES = ['Weekly', 'Biweekly', 'As needed'];
 export const PROGRAMS = ['Accelerator', 'Elite Mastery', 'Foundation'];
 
 // ââ CREDENTIALS ââ
-// Email/password pairs for all users. Supabase will replace this later.
+// Legacy demo credentials — auth is now handled in PortalProvider.
 export const demoCredentials = [
   // Coaches
   { email: 'thomas@acethedat.com', password: 'AceTheDAT2026!', profileId: 'coach-thomas' },
